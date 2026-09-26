@@ -137,6 +137,7 @@ exports.
 | Command                           | Purpose                                                                  |
 | --------------------------------- | ------------------------------------------------------------------------ |
 | `bun run test`                    | Full Bun suite (unit, acceptance C/S/I/O/P/V/Q + R01–R54, API, tooling). |
+| `bun run bench`                   | Word-like 30–500 page documents: per-edit, load/save, and diff timings.  |
 | `bun run test:property`           | Larger reproducible property/simulation budget.                          |
 | `bun run typecheck` / `:core`     | Strict TypeScript; core + runtime without DOM/Node/Bun ambient types.    |
 | `bun run lint`                    | ESLint incl. file/function size limits.                                  |

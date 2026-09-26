@@ -433,7 +433,7 @@ test("public API: client store, history, anchors, proposals, and runtime adapter
     create: () => instance,
     graph,
   };
-  expect(new ClassProjection(client, projectionOptions).ids()).toEqual(["p1", "p2"]);
+  expect(new ClassProjection(client, projectionOptions).ids().sort()).toEqual(["p1", "p2"]);
   const selector: Selector<number> = createSelector(
     client,
     (s) => [s.contentRevision] as const,

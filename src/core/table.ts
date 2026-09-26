@@ -1,5 +1,6 @@
 import type { ComponentNode, ContentItem, DocumentModel, JsonObject } from "./types.ts";
 import { diag, DiagnosticError } from "./diagnostics.ts";
+import { PersistentTable } from "./persistent-table.ts";
 
 /**
  * The flat node-table working representation used by the operation engine.
@@ -68,14 +69,9 @@ export function makeRow(
   childIds: readonly string[],
   persisted: boolean,
 ): TableNode {
-  return Object.freeze({
-    id,
-    tag,
-    props,
-    parentId,
-    children: Object.freeze([...childIds]),
-    persisted,
-  });
+  // The row is frozen; its child list is a private copy typed `readonly` but not frozen:
+  // freezing large arrays is costly (and slows later lookups) in JavaScriptCore.
+  return Object.freeze({ id, tag, props, parentId, children: [...childIds], persisted });
 }
 
 /** Convert a document into an operational table. The root row always has id "$root". */
@@ -111,7 +107,7 @@ export function toTable(model: DocumentModel, allocate: () => string): Table {
   const table = new Map<string, TableNode>();
   const childIds = (model.root.content ?? []).map((item) => ingest(table, item, ROOT_ID, fresh));
   table.set(ROOT_ID, makeRow(ROOT_ID, model.root.tag, model.root.props, null, childIds, false));
-  return table;
+  return PersistentTable.from(table);
 }
 
 /** Adjacent text runs are one effective string; empty runs are no content (SPEC 3.3). */

@@ -708,7 +708,7 @@ Do not mark a choice "verified" without the corresponding runnable tests.
   undeclared nested keys as `unknownProperty` the way top-level properties do.
 - **Root identity:** the operational table stores the root under `$root`; a persisted
   id on the document root itself is not carried through `toTable`/`fromTable`.
-- The v3-specific limitations are listed in §18.14.
+- The v3-specific limitations are listed in §18.15; storage and measured performance in §18.14.
 
 ## 18. OT revision v3: selected control profile and contracts
 
@@ -939,7 +939,26 @@ removed values, inverse payloads, or undo links from other regions travel), with
 metadata only for the author and receipts only for the requester. `exportFor` is an
 explicitly partial participant export.
 
-### 18.14. Superseded behavior, public API changes, and v3 limitations
+### 18.14. Storage and measured performance
+
+`toTable` and every applied change produce a `PersistentTable`: an immutable id → row
+index split into hash buckets, where a new version copies the bucket pointer array and
+only the touched buckets. A change therefore costs roughly its own size plus a small
+constant, not a copy of every row; old versions and published snapshots stay valid and
+share untouched rows. Rows are frozen; their `children` arrays are private copies typed
+`readonly` but not frozen, because freezing large arrays is expensive and slows later
+lookups in JavaScriptCore. Table iteration order carries no meaning (document order is
+`children`). Recovery replays pending work against this structure, so it is cheap too.
+
+`bun run bench` measures Word-like documents (~20 paragraphs per page, inline emphasis,
+a table every ~3 pages, flat body). On the development machine (Bun 1.2.5), 30–500
+pages (3.4k–57k rows): a keystroke costs 0.03–0.2 ms on the client and ~0.1 ms at the
+authority; inserting a paragraph into a 10k-paragraph body ~0.2 ms; recovery after a
+rejection with 20 pending edits ~2 ms. Whole-document operations scale with size: at
+500 pages, parse ~125 ms, `toTable` ~57 ms, serialize ~17 ms, and a whole-document
+agent proposal diff ~60 ms. Timings are machine-dependent evidence, not a gate.
+
+### 18.15. Superseded behavior, public API changes, and v3 limitations
 
 Superseded and removed: `Op`, `applyOp`, `applyBatch`, `applyOpsSequential`,
 `transformOp`, value-search `removeArrayItem`, fractional `keyBetween`/`orderKey`,

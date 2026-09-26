@@ -39,7 +39,8 @@
     "check": "bun run format:check && bun run typecheck && bun run lint && bun run deadcode && bun run build && bun run test && bun run acceptance:check && bun run typecheck:core",
     "clean": "bun run scripts/clean.ts",
     "build": "bun run clean && bun build ./src/index.ts --outdir ./dist --target browser --format esm --sourcemap=external && tsc -p tsconfig.build.json",
-    "test:property": "PROPERTY_BUDGET=2000 PROPERTY_STEPS=120 bun test tests/unit/transform-properties.test.ts tests/acceptance/r-simulation.test.ts tests/acceptance/q.test.ts --timeout 600000"
+    "test:property": "PROPERTY_BUDGET=2000 PROPERTY_STEPS=120 bun test tests/unit/transform-properties.test.ts tests/acceptance/r-simulation.test.ts tests/acceptance/q.test.ts --timeout 600000",
+    "bench": "bun run scripts/bench.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

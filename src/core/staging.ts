@@ -1,3 +1,4 @@
+import { PersistentTable } from "./persistent-table.ts";
 import type { Table, TableNode } from "./table.ts";
 
 export type ApplyErrorCode =
@@ -60,11 +61,6 @@ export class StagedTable {
 
   freeze(): Table {
     if (this.writes.size === 0) return this.base;
-    const next = new Map(this.base);
-    for (const [id, row] of this.writes) {
-      if (row === null) next.delete(id);
-      else next.set(id, row);
-    }
-    return next;
+    return PersistentTable.from(this.base).with(this.writes);
   }
 }
