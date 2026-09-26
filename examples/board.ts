@@ -10,7 +10,7 @@ import {
   createAllocator,
   fromTable,
   parseDocument,
-  schemaInvariants,
+  schemaValidator,
   serializeDocument,
   toTable,
 } from "../src/index.ts";
@@ -24,7 +24,7 @@ async function main(): Promise<void> {
   );
   if (!parsed.ok) throw new Error("parse failed");
   const room = new LocalRoom(toTable(parsed.value, createAllocator()), {
-    validators: [schemaInvariants(boardSchema)],
+    validators: [schemaValidator(boardSchema)],
   });
   const alice = room.join("alice");
   const bob = room.join("bob");

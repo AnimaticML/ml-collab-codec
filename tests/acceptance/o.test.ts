@@ -5,7 +5,7 @@ import type { Change } from "../../src/core/change.ts";
 import type { ChangeBuilder as Builder } from "../../src/core/builder.ts";
 import { wrapText } from "../../src/core/builder-rich.ts";
 import { diffToChanges } from "../../src/core/diff.ts";
-import { schemaInvariants } from "../../src/core/invariants.ts";
+import { schemaValidator } from "../../src/core/invariants.ts";
 import { parseDocument } from "../../src/core/parser.ts";
 import { proposeEdit, rebaseProposal } from "../../src/core/proposal.ts";
 import { serializeDocument } from "../../src/core/serializer.ts";
@@ -30,7 +30,7 @@ function concurrent(
     DOC,
     EPOCH,
     table,
-    validated ? { validators: [schemaInvariants(listSchema)] } : {},
+    validated ? { validators: [schemaValidator(listSchema)] } : {},
   );
   const outcomes = requests.map(([replica, commands]) =>
     outcome(
@@ -292,7 +292,7 @@ test("O14 Temporarily invalid transaction", () => {
 });
 
 test("O15 Invalid final batch is atomic", () => {
-  const room = new Room(pairList, { validators: [schemaInvariants(listSchema)] });
+  const room = new Room(pairList, { validators: [schemaValidator(listSchema)] });
   const client = room.join("a", "replica-a");
   client.transact((b) =>
     b

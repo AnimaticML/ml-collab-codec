@@ -3,10 +3,12 @@ import { codePointLength } from "./change.ts";
 import { deepEqual } from "./normalize.ts";
 import type { JsonValue } from "./types.ts";
 import type { TableNode } from "./table.ts";
-import { makeRow, TEXT_TAG, textOf } from "./table.ts";
+import { makeRow, reshapeRow, TEXT_TAG, textOf } from "./table.ts";
 import { ApplyError, type StagedTable } from "./staging.ts";
 
-type StructuralChange = ChangeOf<"nodeInsert" | "nodeDelete" | "nodeMove" | "split" | "merge">;
+type StructuralChange = ChangeOf<
+  "nodeInsert" | "nodeDelete" | "nodeMove" | "split" | "merge" | "setTag"
+>;
 
 function requireContainer(staged: StagedTable, id: string): TableNode {
   const row = staged.require(id);
@@ -15,7 +17,7 @@ function requireContainer(staged: StagedTable, id: string): TableNode {
 }
 
 function withChildren(row: TableNode, childIds: readonly string[]): TableNode {
-  return makeRow(row.id, row.tag, row.props, row.parentId, childIds, row.persisted);
+  return reshapeRow(row, { children: childIds });
 }
 
 function childAt(parent: TableNode, index: number, expectedId: string): void {
@@ -114,7 +116,7 @@ function applyMove(staged: StagedTable, change: ChangeOf<"nodeMove">): void {
   toIds.splice(change.gap, 0, change.node);
   staged.set(withChildren(from, fromIds));
   staged.set(withChildren(to, toIds));
-  staged.set(makeRow(node.id, node.tag, node.props, to.id, node.children, node.persisted));
+  staged.set(reshapeRow(node, { parentId: to.id }));
 }
 
 function requireRun(staged: StagedTable, id: string): TableNode {
@@ -175,5 +177,20 @@ export function applyStructural(staged: StagedTable, change: StructuralChange): 
       return applySplit(staged, change);
     case "merge":
       return applyMerge(staged, change);
+    case "setTag":
+      return applySetTag(staged, change);
   }
+}
+
+/** Same-identity type change; schema compatibility of props/content is checked on the final candidate. */
+function applySetTag(staged: StagedTable, change: ChangeOf<"setTag">): void {
+  const row = staged.require(change.node);
+  if (row.tag !== change.before)
+    throw new ApplyError("preconditionFailed", "current tag differs from the recorded before tag");
+  if (row.tag === TEXT_TAG || change.after === TEXT_TAG || change.after.length === 0)
+    throw new ApplyError(
+      "invalidTarget",
+      "text runs cannot change type, and a tag must be non-empty",
+    );
+  staged.set(reshapeRow(row, { tag: change.after }));
 }

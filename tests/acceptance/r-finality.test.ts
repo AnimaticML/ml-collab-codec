@@ -4,7 +4,7 @@ import type { Decision } from "../../src/core/authority.ts";
 import { exportCheckpoint, restoreAuthority, CheckpointError } from "../../src/core/checkpoint.ts";
 import type { Change } from "../../src/core/change.ts";
 import type { Client } from "../../src/core/client.ts";
-import { schemaInvariants } from "../../src/core/invariants.ts";
+import { schemaValidator } from "../../src/core/invariants.ts";
 import { AuthorityHost, StaleOwnerError } from "../../src/core/host.ts";
 import { recordOf } from "../../src/core/authority.ts";
 import { mapAnchor } from "../../src/core/anchors.ts";
@@ -89,7 +89,7 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
 
   test("R51 Deduplication survives rejection, holes, pruning, and restart", () => {
     const base = listDoc({ items: ["a", "b"], count: 1 });
-    const auth = Authority.create(DOC, EPOCH, base, { validators: [schemaInvariants(listSchema)] });
+    const auth = Authority.create(DOC, EPOCH, base, { validators: [schemaValidator(listSchema)] });
     const delta = envelope(
       "replica-a",
       1,
@@ -140,7 +140,7 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
     check(auth);
     check(
       restoreAuthority(exportCheckpoint(auth, SCHEMA), [], SCHEMA, {
-        validators: [schemaInvariants(listSchema)],
+        validators: [schemaValidator(listSchema)],
       }),
     );
     expect(() => auth.submit({ ...removeB, changes: [] }, { actor: "replica-c" })).toThrow(

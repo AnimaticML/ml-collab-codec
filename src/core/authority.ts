@@ -1,12 +1,15 @@
-import type { Change } from "./change.ts";
 import { applyChanges } from "./apply.ts";
 import type { RequestId } from "./identity.ts";
 import { Ledger } from "./ledger.ts";
-import type { ReceiptEvent, RequestEnvelope, TransitionEvent } from "./protocol.ts";
+import { DiagnosticError } from "./diagnostics.ts";
+import type { CandidateValidator } from "./invariants.ts";
+import { schemaValidator } from "./invariants.ts";
+import { validateTable } from "./validate.ts";
+import type { ReceiptEvent, TransitionEvent } from "./protocol.ts";
+import type { DecisionContext } from "./authority-evaluate.ts";
+import { evaluateRequest, rejection } from "./authority-evaluate.ts";
 import { decodeRequest, fingerprint, ProtocolError } from "./protocol.ts";
-import { ApplyError } from "./staging.ts";
 import type { Table } from "./table.ts";
-import { isConflict, rebase } from "./transform.ts";
 
 import type {
   AuthorityOptions,
@@ -44,6 +47,9 @@ export class Authority {
   private readonly documentId: string;
   private readonly historyEpoch: string;
 
+  private readonly validators: readonly CandidateValidator[];
+  private readonly listeners = new Set<(transition: TransitionEvent) => void>();
+
   constructor(
     state: AuthorityState,
     private readonly options: AuthorityOptions = {},
@@ -54,6 +60,15 @@ export class Authority {
     this.revision = state.revision;
     this.transitions = [...state.transitions];
     this.ledger = Ledger.fromExport(state.ledger);
+    const schema = options.schema;
+    if (schema !== undefined) {
+      const issues = validateTable(state.table, schema);
+      if (issues.length > 0) throw new DiagnosticError(issues);
+    }
+    this.validators = [
+      ...(schema === undefined ? [] : [schemaValidator(schema)]),
+      ...(options.validators ?? []),
+    ];
   }
 
   static create(
@@ -114,7 +129,9 @@ export class Authority {
     const found = this.ledger.lookup({ replica: envelope.replica, seq: envelope.seq });
     if (found.kind === "found")
       return { kind: "decided", receipt: found.record.receipt, duplicate: true };
-    return this.install(this.reject(envelope, reason, principal.actor, fingerprint(envelope)));
+    return this.install(
+      rejection(this.context(), envelope, reason, principal.actor, fingerprint(envelope)),
+    );
   }
 
   prepare(value: unknown, principal: Principal, trusted = false): Prepared {
@@ -165,7 +182,7 @@ export class Authority {
           reason: "base revision is past the retained transform horizon",
         },
       };
-    return this.evaluate(envelope, history, principal.actor, print, trusted);
+    return evaluateRequest(this.context(), envelope, history, principal.actor, print, trusted);
   }
 
   private transitionFor(receipt: ReceiptEvent): TransitionEvent | undefined {
@@ -173,108 +190,15 @@ export class Authority {
     return revision === undefined ? undefined : this.transitionsSince(revision - 1)?.[0];
   }
 
-  private reject(
-    envelope: RequestEnvelope,
-    reason: string,
-    actor: string,
-    print: string,
-  ): Prepared {
-    const receipt = this.receipt(envelope, "rejected", { reason });
+  private context(): DecisionContext {
     return {
-      ledgerVersion: this.ledgerVersion,
-      decision: { kind: "decided", receipt, duplicate: false },
-      commit: { table: this.table, fingerprint: print, actor },
-    };
-  }
-
-  private receipt(
-    envelope: RequestEnvelope,
-    outcome: ReceiptEvent["outcome"],
-    extra: { reason?: string; committedRevision?: number },
-  ): ReceiptEvent {
-    return {
-      type: "receipt",
       ...this.scope(),
-      request: { replica: envelope.replica, seq: envelope.seq },
-      outcome,
-      evaluatedRevision: this.revision,
-      ...extra,
-    };
-  }
-
-  private relationAllowed(envelope: RequestEnvelope, actor: string): string | null {
-    if (
-      envelope.meta.group !== undefined &&
-      !envelope.meta.group.startsWith(`${envelope.replica}#`)
-    )
-      return "undo groups are scoped to the submitting replica";
-    for (const target of [envelope.meta.undoOf, envelope.meta.redoOf]) {
-      if (target === undefined) continue;
-      const owner = this.ledger.groupOwner(target);
-      if (owner === undefined) return "unknown undo group";
-      if (owner !== actor) return "not authorized";
-    }
-    return null;
-  }
-
-  private evaluate(
-    envelope: RequestEnvelope,
-    history: readonly TransitionEvent[],
-    actor: string,
-    print: string,
-    trusted: boolean,
-  ): Prepared {
-    const relation = this.relationAllowed(envelope, actor);
-    if (relation !== null) return this.reject(envelope, relation, actor, print);
-    let changes: readonly Change[] = envelope.changes;
-    for (const transition of history) {
-      const rebased = rebase(changes, transition.changes);
-      if (isConflict(rebased))
-        return this.reject(envelope, `conflict: ${rebased.conflict}`, actor, print);
-      changes = rebased;
-    }
-    let candidate: Table;
-    try {
-      candidate = applyChanges(this.table, changes);
-    } catch (error) {
-      if (error instanceof ApplyError)
-        return this.reject(envelope, `invalid: ${error.code}`, actor, print);
-      throw error;
-    }
-    if (
-      !trusted &&
-      this.options.authorize !== undefined &&
-      !this.options.authorize(actor, changes, this.table)
-    )
-      return this.reject(envelope, "not authorized", actor, print);
-    for (const validator of this.options.validators ?? []) {
-      const reason = validator(candidate, changes);
-      if (reason !== null) return this.reject(envelope, reason, actor, print);
-    }
-    const commit = { table: candidate, fingerprint: print, actor };
-    if (changes.length === 0) {
-      const receipt = this.receipt(envelope, "alreadySatisfied", {});
-      return {
-        ledgerVersion: this.ledgerVersion,
-        decision: { kind: "decided", receipt, duplicate: false },
-        commit,
-      };
-    }
-    const revision = this.revision + 1;
-    const transition: TransitionEvent = {
-      type: "transition",
-      ...this.scope(),
-      revision,
-      request: { replica: envelope.replica, seq: envelope.seq },
-      actor,
-      meta: envelope.meta,
-      changes,
-    };
-    const receipt = this.receipt(envelope, "applied", { committedRevision: revision });
-    return {
+      table: this.table,
+      revision: this.revision,
+      ledger: this.ledger,
       ledgerVersion: this.ledgerVersion,
-      decision: { kind: "decided", receipt, transition, duplicate: false },
-      commit,
+      validators: this.validators,
+      authorize: this.options.authorize,
     };
   }
 
@@ -296,7 +220,22 @@ export class Authority {
       decision.transition?.meta.group,
     );
     this.ledgerVersion += 1;
+    if (decision.transition !== undefined) this.announce(decision.transition);
     return decision;
+  }
+
+  /**
+   * Observe every accepted transition as it is installed (in revision order).
+   * A join fence subscribes before capturing its snapshot, so no transition
+   * between capture and live delivery can be missed.
+   */
+  subscribe(listener: (transition: TransitionEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private announce(transition: TransitionEvent): void {
+    for (const listener of [...this.listeners]) listener(transition);
   }
 
   hasReceipt(id: RequestId): boolean {
@@ -315,6 +254,7 @@ export class Authority {
     }
     this.ledger.record(record.actor, record.fingerprint, record.receipt, transition?.meta.group);
     this.ledgerVersion += 1;
+    if (transition !== undefined) this.announce(transition);
   }
 
   /** Retire transitions ≤ `revision`; late requests based before it must resync. */

@@ -35,13 +35,11 @@ const NAMED_ENTITIES: Record<string, string> = {
 
 function decodeEntities(text: string): string {
   return text.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, body: string) => {
-    if (body.startsWith("#x") || body.startsWith("#X")) {
-      const code = Number.parseInt(body.slice(2), 16);
-      return Number.isNaN(code) ? match : String.fromCodePoint(code);
-    }
     if (body.startsWith("#")) {
-      const code = Number.parseInt(body.slice(1), 10);
-      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+      const hex = body.startsWith("#x") || body.startsWith("#X");
+      const code = Number.parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10);
+      // Out-of-range code points stay literal text instead of throwing on hostile input.
+      return Number.isSafeInteger(code) && code <= 0x10ffff ? String.fromCodePoint(code) : match;
     }
     const named = NAMED_ENTITIES[body];
     return named ?? match;

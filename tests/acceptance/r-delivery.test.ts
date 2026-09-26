@@ -47,8 +47,9 @@ describe("R34 public API delivery and regression scope", () => {
     expect(scripts["check"]).toContain("typecheck:core");
     expect(scripts["check"]).toContain("build");
     expect(scripts["test:property"]).toContain("PROPERTY_BUDGET");
-    // Unchanged scope: no editor adapters or encryption dependencies were added.
+    // Unchanged scope: no editor adapters or encryption dependencies. The only runtime
+    // dependency is the portable standard JSON Schema validator (remediation §4.1), pinned exactly.
     const manifest = JSON.parse(read("package.json")) as { dependencies?: Record<string, string> };
-    expect(Object.keys(manifest.dependencies ?? {})).toEqual([]);
+    expect(manifest.dependencies ?? {}).toEqual({ "@cfworker/json-schema": "4.1.1" });
   });
 });

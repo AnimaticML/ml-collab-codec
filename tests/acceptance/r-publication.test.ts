@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { schemaInvariants } from "../../src/core/invariants.ts";
+import { schemaValidator } from "../../src/core/invariants.ts";
 import type { ModelCommit, StatusEvent } from "../../src/core/store.ts";
 import { ROOT_ID, textOf } from "../../src/core/table.ts";
 import type { Table } from "../../src/core/table.ts";
@@ -22,7 +22,7 @@ function recorder(client: {
 describe("R23–R26 publication batches and derived state", () => {
   test("R23 Large application batch has one observation boundary", () => {
     const room = new Room(listDoc({ items: ["a"], x: 0 }), {
-      validators: [schemaInvariants(listSchema)],
+      validators: [schemaValidator(listSchema)],
     });
     const client = room.join("a", "replica-a");
     const seen: Table[] = [];

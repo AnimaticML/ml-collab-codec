@@ -14,7 +14,7 @@ import type { ServerEvent } from "./protocol.ts";
 import { CONTROL_PROFILE } from "./protocol.ts";
 import type { SchemaProfile } from "./schema.ts";
 import type { Table, TableNode } from "./table.ts";
-import { makeRow } from "./table.ts";
+import { reshapeRow } from "./table.ts";
 import { diffToChanges } from "./diff.ts";
 import { fromTable } from "./table.ts";
 
@@ -51,9 +51,7 @@ export function projectTable(table: Table, profile: SchemaProfile, principal: st
     const kids = row.children.filter((child) => canSee(table, profile, child, principal));
     visible.set(
       id,
-      kids.length === row.children.length
-        ? row
-        : makeRow(row.id, row.tag, row.props, row.parentId, kids, row.persisted),
+      kids.length === row.children.length ? row : reshapeRow(row, { children: kids }),
     );
   }
   return visible;

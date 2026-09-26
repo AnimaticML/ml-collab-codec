@@ -16,7 +16,8 @@ export type DiagnosticCode =
   | "danglingReference"
   | "cycleDetected"
   | "limitExceeded"
-  | "invalidNesting";
+  | "invalidNesting"
+  | "invalidSchema";
 
 export interface SourceSpan {
   readonly start: number;

@@ -10,7 +10,7 @@ import { classify } from "../../src/core/grouping.ts";
 import { Ledger } from "../../src/core/ledger.ts";
 import type { ReceiptEvent } from "../../src/core/protocol.ts";
 import { ProtocolError } from "../../src/core/protocol.ts";
-import { schemaInvariants } from "../../src/core/invariants.ts";
+import { schemaValidator } from "../../src/core/invariants.ts";
 import { ROOT_ID, textOf } from "../../src/core/table.ts";
 import type { Table } from "../../src/core/table.ts";
 import { isConflict, rebase } from "../../src/core/transform.ts";
@@ -168,7 +168,7 @@ describe("R33 negative controls: operation and protocol faults are detected", ()
     expect(counted(true)).not.toBe(15);
 
     // A rejected request re-executed after the situation relaxed (rejection receipts not retained).
-    const validators = [schemaInvariants(listSchema)];
+    const validators = [schemaValidator(listSchema)];
     const removeB = envelope(
       "replica-c",
       1,

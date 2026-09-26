@@ -1,6 +1,6 @@
 /** JSON value types used throughout the core (no `any` escape hatch). */
 export type JsonScalar = string | number | boolean | null;
-export type JsonValue = JsonScalar | JsonValue[] | { readonly [key: string]: JsonValue };
+export type JsonValue = JsonScalar | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 export type JsonObject = { readonly [key: string]: JsonValue };
 
 /** A persisted structural node: a schema-declared component instance. */
@@ -23,4 +23,14 @@ export interface DocumentModel {
 
 export function isComponentNode(item: ContentItem): item is ComponentNode {
   return typeof item !== "string";
+}
+
+/** A JSON object (not an array or null); narrows correctly for readonly arrays. */
+export function isJsonObject(value: JsonValue | undefined): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A JSON array; `Array.isArray` alone narrows readonly JSON arrays to `any[]`. */
+export function isJsonArray(value: JsonValue | undefined): value is readonly JsonValue[] {
+  return Array.isArray(value);
 }

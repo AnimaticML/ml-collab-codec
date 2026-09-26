@@ -12,6 +12,8 @@ export default tseslint.config(
       // Consumer of the *built* declarations: it only resolves after `bun run build`, and it is
       // type-checked by tsc against dist/types inside acceptance test Q02.
       "tests/fixtures/consumer-types/**",
+      // Historical review probes, preserved byte-for-byte (see review-evidence/README.md).
+      "review-evidence/**",
     ],
   },
   {

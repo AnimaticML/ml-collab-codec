@@ -1,33 +1,42 @@
-import type { JsonValue } from "./types.ts";
-import { type Diagnostic, DiagnosticError, diag } from "./diagnostics.ts";
+import type { JsonObject, JsonValue } from "./types.ts";
 
 /**
- * A compact, JSON-Schema-inspired property description. This is the library's
- * chosen dialect/profile: a constrained subset (SPEC section 2) sufficient for
- * scalars, arrays of scalars, nested objects, and component references, with
- * library annotations for defaults, additive (delta-capable) numbers, and
- * reference roles. Not every JSON Schema keyword is supported; unsupported
- * shapes are a registration-time capability error, not silent `any`.
+ * Compiled, read-only schema descriptors. Applications author schemas as
+ * JSON Schema 2020-12 manifests (`defineDocumentSchema`, see
+ * `schema-definition.ts`) or import the legacy compact profile
+ * (`registerSchema`); both compile to this one internal form, which every
+ * codec, validation, editing, and export path reads.
  */
-export type PropertyType = "string" | "number" | "boolean" | "array" | "object";
+export type ValueType = "string" | "number" | "integer" | "boolean" | "array" | "object";
+
+/** Policy for keys an object schema does not declare. */
+export type AdditionalPolicy =
+  | { readonly kind: "reject" }
+  | { readonly kind: "preserve" }
+  | { readonly kind: "schema"; readonly schema: PropertySchema };
 
 export interface PropertySchema {
-  readonly type: PropertyType;
-  /** JSON Schema `default` [J1]. Present iff the field is optional-with-default. */
+  /** Absent when the value is constrained only by `enum`/`const`/variants. */
+  readonly type?: ValueType;
   readonly default?: JsonValue;
-  /** True marks a field as genuinely required (absent default does not imply required). */
-  readonly required?: boolean;
-  /** For type "array": element schema. Scalars only unless declared object items. */
+  readonly enum?: readonly JsonValue[];
+  readonly const?: JsonValue;
+  /** Array element schema. */
   readonly items?: PropertySchema;
-  /** For type "array": minimum length invariant, enforced by removeArrayItem and static validation. */
-  readonly minItems?: number;
-  /** For type "object": declared nested attribute-addressable properties. */
+  /** Object members and their policy. */
   readonly properties?: Readonly<Record<string, PropertySchema>>;
-  /** For type "number": participates in additive delta operations (SPEC 7.1). */
+  readonly required?: readonly string[];
+  readonly additional?: AdditionalPolicy;
+  /**
+   * `oneOf`/`anyOf`: the value is validated by the standard validator as a
+   * whole; no nested null/default normalization happens inside it.
+   */
+  readonly variants?: boolean;
+  /** `x-additive`: accepts relative `delta` operations (safe integers only). */
   readonly additive?: boolean;
-  /** For type "string": marks this field as an internal-reference/domain ID. */
-  readonly referenceRole?: "definition" | "reference";
-  /** For type "array" of strings/numbers: permit the comma-shorthand encoding. */
+  /** `x-reference`: domain reference role for integrity checks. */
+  readonly reference?: "definition" | "reference";
+  /** `x-encoding: "comma"`: a primitive array may use the comma attribute shorthand. */
   readonly commaShorthand?: boolean;
 }
 
@@ -35,16 +44,14 @@ export type ContentMode = "mixed" | "element" | "none";
 
 export interface ComponentSchema {
   readonly tag: string;
-  /** Structural boundary: nodes of this tag receive a stable, addressable ID. */
+  /** Structural boundary: nodes of this tag carry a persistent, addressable ID. */
   readonly identity: "stable" | "none";
+  readonly content: { readonly mode: ContentMode; readonly allowedTags?: readonly string[] };
+  /** Root object descriptor of the component's properties. */
+  readonly props: PropertySchema;
+  /** Shortcut for `props.properties` (declared top-level properties). */
   readonly properties: Readonly<Record<string, PropertySchema>>;
-  readonly content: {
-    readonly mode: ContentMode;
-    readonly allowedTags?: readonly string[];
-  };
-  /** Explicit opaque-extension escape hatch (SPEC 4.2/C11): retain unknown properties verbatim. */
-  readonly allowOpaqueProperties?: boolean;
-  /** SPEC 13: a node of this tag is a homogeneous-visibility region owned by this string property's value. */
+  /** SPEC 13: a node of this tag is a visibility region owned by this string property. */
   readonly regionOwnerProp?: string;
 }
 
@@ -53,80 +60,40 @@ export interface SchemaProfile {
   readonly version: string;
   readonly rootTag: string;
   readonly components: Readonly<Record<string, ComponentSchema>>;
-  /** "opaque" preserves unknown tags/properties verbatim instead of erroring. */
-  readonly unknownPolicy: "error" | "opaque";
-}
-
-function validateDefault(schemaPath: string, property: PropertySchema): Diagnostic[] {
-  if (property.default === undefined) return [];
-  const diagnostics: Diagnostic[] = [];
-  const value = property.default;
-  const matches =
-    (property.type === "string" && typeof value === "string") ||
-    (property.type === "number" && typeof value === "number") ||
-    (property.type === "boolean" && typeof value === "boolean") ||
-    (property.type === "array" && Array.isArray(value)) ||
-    (property.type === "object" &&
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value));
-  if (!matches) {
-    diagnostics.push(
-      diag(
-        "invalidValue",
-        schemaPath,
-        `default value does not match declared type ${property.type}`,
-      ),
-    );
-  }
-  return diagnostics;
-}
-
-function validateComponentSchema(component: ComponentSchema, path: string): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  if (component.identity === "stable" && component.tag.length === 0) {
-    diagnostics.push(diag("invalidValue", path, "component tag must be non-empty"));
-  }
-  for (const [name, property] of Object.entries(component.properties)) {
-    diagnostics.push(...validateDefault(`${path}.properties.${name}`, property));
-    if (property.type === "object" && property.properties) {
-      for (const [nestedName, nested] of Object.entries(property.properties)) {
-        diagnostics.push(
-          ...validateDefault(`${path}.properties.${name}.properties.${nestedName}`, nested),
-        );
-      }
-    }
-  }
-  return diagnostics;
-}
-
-/**
- * Register a schema profile: validates the profile itself (declared defaults
- * must match their declared types, tags must be usable). Throws a
- * {@link DiagnosticError} on an invalid profile.
- */
-export function registerSchema(profile: SchemaProfile): SchemaProfile {
-  const diagnostics: Diagnostic[] = [];
-  if (!(profile.rootTag in profile.components)) {
-    diagnostics.push(
-      diag("invalidValue", "rootTag", `rootTag "${profile.rootTag}" has no component schema`),
-    );
-  }
-  for (const [tag, component] of Object.entries(profile.components)) {
-    if (tag !== component.tag) {
-      diagnostics.push(
-        diag("invalidValue", `components.${tag}`, "component key must equal its own tag"),
-      );
-    }
-    diagnostics.push(...validateComponentSchema(component, `components.${tag}`));
-  }
-  if (diagnostics.length > 0) throw new DiagnosticError(diagnostics);
-  return profile;
+  /** Components whose tag the schema does not declare: rejected, or preserved opaquely. */
+  readonly unknownComponents: "reject" | "preserve";
+  /** Standard JSON Schema of each component's props, with `$defs`, for the validator. */
+  readonly standardProps: Readonly<Record<string, JsonObject>>;
+  /** Shared local definitions (`#/$defs/...`). */
+  readonly definitions: JsonObject;
 }
 
 export function getComponentSchema(
   profile: SchemaProfile,
   tag: string,
 ): ComponentSchema | undefined {
-  return profile.components[tag];
+  return Object.hasOwn(profile.components, tag) ? profile.components[tag] : undefined;
+}
+
+/** Descend a property path (object keys and array indexes) through descriptors. */
+export function propertyAtPath(
+  root: PropertySchema | undefined,
+  path: readonly (string | number)[],
+): PropertySchema | undefined {
+  let cursor = root;
+  for (const segment of path) {
+    if (cursor === undefined || cursor.variants === true) return undefined;
+    if (typeof segment === "number") cursor = cursor.items;
+    else {
+      const declared = cursor.properties?.[segment];
+      const additional = cursor.additional;
+      cursor =
+        declared !== undefined && Object.hasOwn(cursor.properties ?? {}, segment)
+          ? declared
+          : additional?.kind === "schema"
+            ? additional.schema
+            : undefined;
+    }
+  }
+  return cursor;
 }

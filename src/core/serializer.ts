@@ -1,9 +1,17 @@
 import type { ComponentNode, ContentItem, DocumentModel, JsonValue } from "./types.ts";
-import { isComponentNode } from "./types.ts";
-import type { ComponentSchema, PropertySchema, SchemaProfile } from "./schema.ts";
+import type { PropertySchema, SchemaProfile } from "./schema.ts";
+import { getComponentSchema, propertyAtPath } from "./schema.ts";
 import { deepEqual } from "./normalize.ts";
 import { propertyToAttributeName } from "./naming.ts";
 
+/**
+ * Canonical, lossless printing: every accepted effective datum survives
+ * `parse(print(model))`, including preserved (opaque) properties of known
+ * components and structured values of unknown opaque components. A value is
+ * written as an attribute only when the parser provably decodes that
+ * attribute back to the same property and value; everything else goes into
+ * the component's JSON block.
+ */
 function escapeText(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -12,66 +20,68 @@ function escapeAttribute(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
+/** `</` cannot appear inside the script element that carries JSON. */
 function escapeJsonForScript(json: string): string {
   return json.replace(/<\//g, "<\\/");
 }
 
-function isCommaSafe(
-  schema: PropertySchema,
-  value: JsonValue,
-): value is (string | number | boolean)[] {
-  if (
-    schema.type !== "array" ||
-    !schema.commaShorthand ||
-    !Array.isArray(value) ||
-    value.length === 0
-  )
-    return false;
-  return value.every((member) => {
-    if (typeof member === "object" || member === null) return false;
-    const text = String(member);
-    return (
-      typeof member !== "string" || (!text.includes(",") && text === text.trim() && text.length > 0)
-    );
-  });
+const ATTRIBUTE_NAME = /^-?[a-z][a-z0-9-]*$/;
+
+function attributeName(property: string): string | null {
+  if (property === "id" || property.includes(".")) return null;
+  const name = propertyToAttributeName(property);
+  return name !== null && ATTRIBUTE_NAME.test(name) ? name : null;
 }
 
-interface AttributeEncoding {
-  readonly attributes: string[];
-  readonly jsonProps: Record<string, JsonValue>;
-}
-
-function encodeProp(
-  name: string,
-  schema: PropertySchema,
-  value: JsonValue,
-): { attr: string | null; json: boolean } {
-  if (schema.type === "object") return { attr: null, json: true };
-  const attrName = propertyToAttributeName(name);
-  if (attrName === null) return { attr: null, json: true };
-  if (schema.type === "array") {
-    if (!isCommaSafe(schema, value)) return { attr: null, json: true };
-    return { attr: `${attrName}="${escapeAttribute(value.join(","))}"`, json: false };
+function commaText(schema: PropertySchema, value: readonly JsonValue[]): string | null {
+  if (value.length === 0) return null;
+  const parts: string[] = [];
+  for (const member of value) {
+    if (typeof member === "string") {
+      if (member.includes(",") || member !== member.trim() || member.length === 0) return null;
+      if (schema.items?.type !== "string") return null;
+    } else if (typeof member !== "number" && typeof member !== "boolean") return null;
+    parts.push(String(member));
   }
-  const scalar: string | number | boolean = typeof value === "object" ? "" : value;
-  return { attr: `${attrName}="${escapeAttribute(String(scalar))}"`, json: false };
+  return parts.join(",");
+}
+
+/** Attribute text that decodes to exactly `value` under `schema`, or null. */
+function attributeText(schema: PropertySchema | undefined, value: JsonValue): string | null {
+  if (schema === undefined) return typeof value === "string" ? value : null;
+  switch (schema.type) {
+    case "string":
+      return typeof value === "string" ? value : null;
+    case "number":
+    case "integer":
+    case "boolean":
+      return typeof value === "number" || typeof value === "boolean" ? String(value) : null;
+    case "array":
+      return schema.commaShorthand === true && Array.isArray(value)
+        ? commaText(schema, value)
+        : null;
+    default:
+      return null;
+  }
 }
 
 function encodeProps(
-  component: ComponentSchema,
-  props: Readonly<Record<string, JsonValue>>,
-): AttributeEncoding {
+  node: ComponentNode,
+  profile: SchemaProfile,
+): { attributes: string[]; json: Record<string, JsonValue> } {
+  const root = getComponentSchema(profile, node.tag)?.props;
   const attributes: string[] = [];
-  const jsonProps: Record<string, JsonValue> = {};
-  for (const [name, schema] of Object.entries(component.properties)) {
-    const value = props[name];
-    if (value === undefined) continue;
-    if (schema.default !== undefined && deepEqual(value, schema.default)) continue;
-    const encoded = encodeProp(name, schema, value);
-    if (encoded.json) jsonProps[name] = value;
-    else if (encoded.attr !== null) attributes.push(encoded.attr);
+  const json: Record<string, JsonValue> = {};
+  for (const [name, value] of Object.entries(node.props)) {
+    // The same lookup the parser uses to decode an attribute of this name.
+    const schema = propertyAtPath(root, [name]);
+    if (schema?.default !== undefined && deepEqual(value, schema.default)) continue;
+    const attr = attributeName(name);
+    const text = attr === null ? null : attributeText(schema, value);
+    if (attr !== null && text !== null) attributes.push(`${attr}="${escapeAttribute(text)}"`);
+    else json[name] = value;
   }
-  return { attributes, jsonProps };
+  return { attributes, json };
 }
 
 function serializeContent(items: readonly ContentItem[], profile: SchemaProfile): string {
@@ -81,42 +91,16 @@ function serializeContent(items: readonly ContentItem[], profile: SchemaProfile)
 }
 
 function serializeNode(node: ComponentNode, profile: SchemaProfile): string {
-  const component = profile.components[node.tag];
-  if (component === undefined) return serializeOpaqueNode(node, profile);
-  const { attributes, jsonProps } = encodeProps(component, node.props);
-  const attrParts =
+  const { attributes, json } = encodeProps(node, profile);
+  const parts =
     node.id === undefined ? attributes : [`id="${escapeAttribute(node.id)}"`, ...attributes];
-  const hasJson = Object.keys(jsonProps).length > 0;
-  const content = node.content ?? [];
-  if (!hasJson && content.length === 0) {
-    return `<${node.tag}${attrParts.length > 0 ? " " + attrParts.join(" ") : ""} />`;
-  }
-  const jsonBlock = hasJson
-    ? `<script type="application/json">${escapeJsonForScript(JSON.stringify(jsonProps))}</script>`
-    : "";
-  const body = jsonBlock + serializeContent(content, profile);
-  return `<${node.tag}${attrParts.length > 0 ? " " + attrParts.join(" ") : ""}>${body}</${node.tag}>`;
-}
-
-function serializeOpaqueNode(node: ComponentNode, profile: SchemaProfile): string {
-  const attrParts: string[] = [];
-  if (node.id !== undefined) attrParts.push(`id="${escapeAttribute(node.id)}"`);
-  for (const [key, value] of Object.entries(node.props)) {
-    if (typeof value === "string") attrParts.push(`${key}="${escapeAttribute(value)}"`);
-  }
-  const content = node.content ?? [];
-  if (content.length === 0)
-    return `<${node.tag}${attrParts.length > 0 ? " " + attrParts.join(" ") : ""} />`;
-  const body = content
-    .map((item) =>
-      typeof item === "string"
-        ? escapeText(item)
-        : isComponentNode(item)
-          ? serializeNode(item, profile)
-          : "",
-    )
-    .join("");
-  return `<${node.tag}${attrParts.length > 0 ? " " + attrParts.join(" ") : ""}>${body}</${node.tag}>`;
+  const open = `<${node.tag}${parts.length > 0 ? ` ${parts.join(" ")}` : ""}`;
+  const block =
+    Object.keys(json).length > 0
+      ? `<script type="application/json">${escapeJsonForScript(JSON.stringify(json))}</script>`
+      : "";
+  const body = block + serializeContent(node.content ?? [], profile);
+  return body.length === 0 ? `${open} />` : `${open}>${body}</${node.tag}>`;
 }
 
 export function serializeDocument(model: DocumentModel, profile: SchemaProfile): string {

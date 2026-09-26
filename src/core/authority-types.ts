@@ -1,6 +1,7 @@
 import type { Change } from "./change.ts";
 import type { RequestId } from "./identity.ts";
 import type { CandidateValidator } from "./invariants.ts";
+import type { SchemaProfile } from "./schema.ts";
 import type { LedgerExport } from "./ledger.ts";
 import type { ReceiptEvent, TransitionEvent } from "./protocol.ts";
 import type { Table } from "./table.ts";
@@ -24,6 +25,12 @@ export interface AuthorityState {
 }
 
 export interface AuthorityOptions {
+  /**
+   * The recommended setup: the initial state must satisfy this schema, and
+   * every final candidate is checked by `schemaValidator(schema)` before any
+   * other validator.
+   */
+  readonly schema?: SchemaProfile;
   readonly validators?: readonly CandidateValidator[];
   readonly authorize?: Authorizer;
 }

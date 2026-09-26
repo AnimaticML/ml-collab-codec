@@ -7,3 +7,7 @@ bun.lock
 # Owner-supplied revision handoffs are kept byte-for-byte as received.
 OT_REVISION_HANDOFF.md
 OT_REVISION_ACCEPTANCE.md
+ML_COLLAB_REMEDIATION.md
+ML_COLLAB_REMEDIATION_ACCEPTANCE.md
+# Historical review evidence, preserved byte-for-byte.
+review-evidence/

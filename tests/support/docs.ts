@@ -1,5 +1,5 @@
 import type { JsonObject } from "../../src/core/types.ts";
-import { registerSchema } from "../../src/core/schema.ts";
+import { defineDocumentSchema } from "../../src/core/schema-document.ts";
 import type { SchemaProfile } from "../../src/core/schema.ts";
 import type { Table, TableNode } from "../../src/core/table.ts";
 import { makeRow, ROOT_ID, TEXT_TAG, textOf } from "../../src/core/table.ts";
@@ -39,27 +39,32 @@ export function items(table: Table, node = ROOT_ID): unknown {
 }
 
 /** Trusted schema with an invariant-bound collection (minItems = 1) and an additive counter. */
-export const listSchema: SchemaProfile = registerSchema({
+export const listSchema: SchemaProfile = defineDocumentSchema({
   id: "fixture.list",
   version: "1.0.0",
   rootTag: "list",
-  unknownPolicy: "error",
   components: {
     list: {
-      tag: "list",
       identity: "none",
-      properties: {
-        items: { type: "array", items: { type: "string" }, minItems: 1 },
-        count: { type: "number", additive: true, default: 0 },
-        x: { type: "number", default: 0 },
-      },
       content: { mode: "element", allowedTags: ["item"] },
+      props: {
+        type: "object",
+        properties: {
+          items: { type: "array", items: { type: "string" }, minItems: 1 },
+          count: { type: "integer", "x-additive": true, default: 0 },
+          x: { type: "number", default: 0 },
+        },
+        additionalProperties: false,
+      },
     },
     item: {
-      tag: "item",
       identity: "stable",
-      properties: { label: { type: "string" } },
       content: { mode: "none" },
+      props: {
+        type: "object",
+        properties: { label: { type: "string" } },
+        additionalProperties: false,
+      },
     },
   },
 });

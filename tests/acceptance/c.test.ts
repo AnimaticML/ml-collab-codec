@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { richTextSchema } from "../fixtures/rich-text-schema.ts";
 import { parseDocument, parseFragment, parseMultiRoot } from "../../src/core/parser.ts";
+import type { ContentItem } from "../../src/core/types.ts";
+
+/** Top-level items of a fragment parse (empty when the parse failed). */
+function itemsOf(result: ReturnType<typeof parseFragment>): readonly ContentItem[] {
+  return result.ok ? result.value : [];
+}
 import { serializeDocument, serializeFragment } from "../../src/core/serializer.ts";
-import { registerSchema } from "../../src/core/schema.ts";
+import { registerSchema } from "../../src/core/schema-legacy.ts";
 import type { SchemaProfile } from "../../src/core/schema.ts";
 import { deepEqual } from "../../src/core/normalize.ts";
 
@@ -87,7 +93,7 @@ describe("C03 Equivalent optional values", () => {
 test("C04 Unambiguous string and array encoding", () => {
   const parsed = parseFragment(`<p id="p1" title="0012" tags="a,b,c" />`, richTextSchema);
   expect(parsed.diagnostics).toEqual([]);
-  const [node] = parsed.items;
+  const [node] = itemsOf(parsed);
   expect(node && typeof node !== "string" ? node.props["title"] : undefined).toBe("0012");
   expect(node && typeof node !== "string" ? node.props["tags"] : undefined).toEqual([
     "a",
@@ -95,7 +101,7 @@ test("C04 Unambiguous string and array encoding", () => {
     "c",
   ]);
   const falseParsed = parseFragment(`<p id="p2" title="false" />`, richTextSchema);
-  const [falseNode] = falseParsed.items;
+  const [falseNode] = itemsOf(falseParsed);
   expect(falseNode && typeof falseNode !== "string" ? falseNode.props["title"] : undefined).toBe(
     "false",
   );
@@ -121,7 +127,7 @@ test("C06 Duplicate stable IDs", () => {
   expect(parsed.diagnostics.some((d) => d.code === "duplicateId")).toBe(true);
 });
 
-function firstNode(items: ReturnType<typeof parseFragment>["items"]) {
+function firstNode(items: readonly ContentItem[]) {
   const [node] = items;
   return node && typeof node !== "string" ? node : undefined;
 }
@@ -130,7 +136,7 @@ test("C07 JSON block and path mapping", () => {
   const source = `<p id="p1" opacity="0.5"><script type="application/json">{"opacity":0.9,"style":{"color":"red"}}</script><script type="application/json" data-property="style">{"weight":2}</script></p>`;
   const parsed = parseFragment(source, richTextSchema);
   expect(parsed.diagnostics).toEqual([]);
-  const node = firstNode(parsed.items);
+  const node = firstNode(itemsOf(parsed));
   expect(node?.props["opacity"]).toBe(0.9);
   expect(node?.props["style"]).toEqual({ color: "red", weight: 2 });
 
@@ -151,9 +157,9 @@ test("C08 Escaping and hostile keys", () => {
   const source = `<p id="p1">before &lt;/script&gt; &amp; &quot;quoted&quot; after</p>`;
   const parsed = parseFragment(source, richTextSchema);
   expect(parsed.diagnostics).toEqual([]);
-  const node = firstNode(parsed.items);
+  const node = firstNode(itemsOf(parsed));
   expect(node?.content).toEqual(['before </script> & "quoted" after']);
-  const printed = serializeFragment(parsed.items, richTextSchema);
+  const printed = serializeFragment(itemsOf(parsed), richTextSchema);
   expect(printed.includes("</script")).toBe(false);
 
   const hostile = parseFragment(
@@ -198,16 +204,16 @@ test("C10 JSON precedence and reversible names", () => {
   const source = `<p id="p1" opacity="0.2"><script type="application/json">{"opacity":0.8}</script></p>`;
   const parsed = parseFragment(source, richTextSchema);
   expect(parsed.diagnostics).toEqual([]);
-  expect(firstNode(parsed.items)?.props["opacity"]).toBe(0.8);
+  expect(firstNode(itemsOf(parsed))?.props["opacity"]).toBe(0.8);
 
-  const printed = serializeFragment(parsed.items, richTextSchema);
+  const printed = serializeFragment(itemsOf(parsed), richTextSchema);
   expect(printed.includes('opacity="0.8"')).toBe(true);
 
   const styleSource = `<p id="p2"><script type="application/json">{"style":{"color":"blue"}}</script></p>`;
   const styleParsed = parseFragment(styleSource, richTextSchema);
   expect(styleParsed.diagnostics).toEqual([]);
   {
-    const stylePrinted = serializeFragment(styleParsed.items, richTextSchema);
+    const stylePrinted = serializeFragment(itemsOf(styleParsed), richTextSchema);
     expect(stylePrinted.includes('"style"')).toBe(true);
     expect(stylePrinted.includes("style=")).toBe(false);
   }
@@ -263,9 +269,9 @@ describe("C13 Comments, roots, and content modes", () => {
     expect(printed.includes("source only")).toBe(false);
     expect(printed.includes('text="note"')).toBe(true);
   });
-  test("C13 single-root mode rejects extra roots; multi-root mode retains all", () => {
+  test("C13 a document rejects extra roots; the multi-root parser retains all", () => {
     const source = `<doc><p id="p1">a</p></doc><doc><p id="p2">b</p></doc>`;
-    const single = parseDocument(source, richTextSchema, { rootMode: "single" });
+    const single = parseDocument(source, richTextSchema);
     expect(single.ok).toBe(false);
     if (!single.ok) expect(single.diagnostics.some((d) => d.code === "extraRoot")).toBe(true);
     const multi = parseMultiRoot(source, richTextSchema);
@@ -275,7 +281,7 @@ describe("C13 Comments, roots, and content modes", () => {
   test("C13 element-only content mode ignores inter-element indentation", () => {
     const fragment = parseFragment(`<p id="p1">\n  <emphasis>x</emphasis>\n</p>`, richTextSchema);
     expect(fragment.diagnostics.length).toBe(0);
-    const printed = serializeFragment(fragment.items, richTextSchema);
+    const printed = serializeFragment(itemsOf(fragment), richTextSchema);
     expect(printed.includes("<p")).toBe(true);
   });
 });

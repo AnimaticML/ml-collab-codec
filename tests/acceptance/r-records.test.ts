@@ -8,7 +8,7 @@ import type { Change } from "../../src/core/change.ts";
 import { invertChanges } from "../../src/core/change.ts";
 import { canonicalJson, decodeChanges } from "../../src/core/change-codec.ts";
 import { compose } from "../../src/core/compose.ts";
-import { schemaInvariants } from "../../src/core/invariants.ts";
+import { schemaValidator } from "../../src/core/invariants.ts";
 import { ProtocolError } from "../../src/core/protocol.ts";
 import { ApplyError } from "../../src/core/staging.ts";
 import type { Table } from "../../src/core/table.ts";
@@ -188,7 +188,7 @@ describe("R10–R15 reversible records, composition, and grouping", () => {
 
   test("R12 Numeric profile: apply, undo, and arithmetic boundaries", () => {
     const room = new Room(listDoc({ count: 10, x: 0.5, items: ["a"] }), {
-      validators: [schemaInvariants(listSchema)],
+      validators: [schemaValidator(listSchema)],
     });
     const a = room.join("a", "replica-a");
     const b = room.join("b", "replica-b");

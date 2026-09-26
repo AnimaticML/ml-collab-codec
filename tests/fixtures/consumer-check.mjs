@@ -24,7 +24,7 @@ import {
   DerivedGraph,
   ClassProjection,
   createSelector,
-  schemaInvariants,
+  schemaValidator,
 } from "../../dist/index.js";
 
 function check(condition, message) {
@@ -171,7 +171,7 @@ const board = registerSchema({
 const boardParsed = parseDocument(`<board tags="a,a,b"><cell id="c1" value="10" /></board>`, board);
 check(boardParsed.ok, "board parse failed");
 const boardRoom = room(toTable(boardParsed.value, createAllocator()), ["a", "b"], {
-  validators: [schemaInvariants(board)],
+  validators: [schemaValidator(board)],
 });
 boardRoom.clients.a.transact((b) => b.delta("c1", "value", 2).arrayDelete("$root", ["tags"], 0));
 boardRoom.clients.b.transact((b) => b.delta("c1", "value", 3).arrayDelete("$root", ["tags"], 1));

@@ -1,4 +1,4 @@
-import type { Change } from "./change.ts";
+import type { Change, ChangeOf } from "./change.ts";
 import { destroyedNodes, requiredNodes } from "./change.ts";
 import { transformNodeChange } from "./transform-nodes.ts";
 import { transformPropChange } from "./transform-props.ts";
@@ -53,7 +53,17 @@ function transformChange(a: Change, b: Change): TransformResult {
     case "nodeDelete":
     case "nodeMove":
       return transformNodeChange(a, b);
+    case "setTag":
+      return transformSetTag(a, b);
   }
+}
+
+/** A type change is a checked write of one node's tag: equal retags agree, different ones conflict. */
+function transformSetTag(a: ChangeOf<"setTag">, b: Change): TransformResult {
+  if (b.kind !== "setTag" || b.node !== a.node) return [a];
+  return b.after === a.after
+    ? []
+    : conflict("concurrentWrite", "the node's type was concurrently changed");
 }
 
 export interface Transformed {

@@ -1,3 +1,4 @@
+import { isJsonArray } from "./types.ts";
 import type { JsonValue } from "./types.ts";
 import type { ChangeBuilder, NodeSpec } from "./builder.ts";
 import { getAtPath } from "./json-path.ts";
@@ -87,7 +88,7 @@ export function findOccurrence(
   value: JsonValue,
 ): OccurrenceLookup {
   const array = getAtPath(table.get(node)?.props ?? {}, path);
-  if (!Array.isArray(array)) return { status: "none" };
+  if (!isJsonArray(array)) return { status: "none" };
   const indexes = array.flatMap((item, i) => (deepEqual(item, value) ? [i] : []));
   if (indexes.length === 0) return { status: "none" };
   return indexes.length === 1

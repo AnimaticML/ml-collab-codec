@@ -1,3 +1,4 @@
+import { isJsonArray } from "./types.ts";
 import type { JsonObject, JsonValue } from "./types.ts";
 import type { Change, Origin, SubtreeRecord } from "./change.ts";
 import { codePointLength } from "./change.ts";
@@ -9,6 +10,7 @@ import type { Table, TableNode } from "./table.ts";
 import { TEXT_TAG, textOf } from "./table.ts";
 import { ApplyError, StagedTable } from "./staging.ts";
 import { deepEqual } from "./normalize.ts";
+import { copyJsonStrict } from "./json-copy.ts";
 
 /** A node to create: persisted nodes carry their schema-selected id; others get an internal handle. */
 export interface NodeSpec {
@@ -79,8 +81,10 @@ export class ChangeBuilder {
     return `${this.author.replica}~${this.author.seq}.${this.handles}`;
   }
 
-  set(node: string, path: PropPath | string, value: JsonValue | undefined): this {
+  /** Set or remove a value; the value is acquired by deep copy (later caller edits do not leak in). */
+  set(node: string, path: PropPath | string, input: JsonValue | undefined): this {
     const fullPath = typeof path === "string" ? [path] : path;
+    const value = input === undefined ? undefined : copyJsonStrict(input);
     const before = getAtPath(this.staged.require(node).props, fullPath);
     if (
       before === undefined ? value === undefined : value !== undefined && deepEqual(before, value)
@@ -110,11 +114,12 @@ export class ChangeBuilder {
 
   private array(node: string, path: PropPath): readonly JsonValue[] {
     const value = getAtPath(this.staged.require(node).props, path);
-    if (!Array.isArray(value)) throw new ApplyError("preconditionFailed", "target is not an array");
+    if (!isJsonArray(value)) throw new ApplyError("preconditionFailed", "target is not an array");
     return value;
   }
 
-  arrayInsert(node: string, path: PropPath, index: number, values: readonly JsonValue[]): this {
+  arrayInsert(node: string, path: PropPath, index: number, input: readonly JsonValue[]): this {
+    const values = copyJsonStrict(input) as readonly JsonValue[];
     this.push({ kind: "arrayInsert", node, path, index, values, origin: this.origin() });
     return this;
   }
@@ -171,7 +176,7 @@ export class ChangeBuilder {
     return {
       id: spec.id ?? this.newHandle(),
       tag: spec.tag,
-      props: spec.props ?? {},
+      props: copyJsonStrict(spec.props ?? {}) as JsonObject,
       persisted: spec.id !== undefined,
       children: (spec.children ?? []).map((child) => this.subtreeFrom(child)),
     };
@@ -182,6 +187,14 @@ export class ChangeBuilder {
     const subtree = this.subtreeFrom(spec);
     this.push({ kind: "nodeInsert", parent, index, subtree, origin: this.origin() });
     return subtree.id;
+  }
+
+  /** Change a node's type while keeping its identity (for example paragraph → heading). */
+  setTag(node: string, tag: string): this {
+    const before = this.staged.require(node).tag;
+    if (before !== tag)
+      this.push({ kind: "setTag", node, before, after: tag, origin: this.origin() });
+    return this;
   }
 
   deleteNode(id: string): this {

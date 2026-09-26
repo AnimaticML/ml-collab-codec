@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { schemaInvariants } from "../../src/core/invariants.ts";
+import { schemaValidator } from "../../src/core/invariants.ts";
 import { ProtocolError } from "../../src/core/protocol.ts";
 import { ROOT_ID, textOf } from "../../src/core/table.ts";
 import { childrenDoc, items, listDoc, listSchema, textDoc } from "../support/docs.ts";
@@ -188,7 +188,7 @@ describe("R16–R22 collaborative undo/redo and pending intent", () => {
 
   test("R20 Undo respects current constraints and authorization", () => {
     const room = new Room(listDoc({ items: ["b"] }), {
-      validators: [schemaInvariants(listSchema)],
+      validators: [schemaValidator(listSchema)],
     });
     const own = room.join("own", "replica-o");
     const other = room.join("other", "replica-r");
@@ -203,7 +203,7 @@ describe("R16–R22 collaborative undo/redo and pending intent", () => {
     expect(receipt?.kind === "decided" && receipt.receipt.outcome).toBe("rejected");
     expect(items(room.authority.getTable())).toEqual(["a"]);
     expect(own.history.latestUndoable()?.id).toBe(group.group);
-    expect(own.history.get(group.group ?? "")?.lastError).toContain("at least 1");
+    expect(own.history.get(group.group ?? "")?.lastError).toContain("too few items");
 
     // Rights revoked between the action and its undo: checked at commit, nothing half-applied.
     const allowed = new Set(["alice"]);

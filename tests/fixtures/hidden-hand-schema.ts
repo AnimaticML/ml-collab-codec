@@ -1,40 +1,42 @@
-import { registerSchema } from "../../src/core/schema.ts";
+import { defineDocumentSchema } from "../../src/core/schema-document.ts";
 import type { SchemaProfile } from "../../src/core/schema.ts";
 
 /** A tiny card game: a public table and per-player private hands (SPEC 13). */
-export const hiddenHandSchema: SchemaProfile = registerSchema({
+export const hiddenHandSchema: SchemaProfile = defineDocumentSchema({
   id: "fixture.hidden-hand",
   version: "1.0.0",
   rootTag: "game",
-  unknownPolicy: "error",
   components: {
     game: {
-      tag: "game",
       identity: "none",
-      properties: {},
       content: { mode: "element", allowedTags: ["table", "hand"] },
+      props: { type: "object", properties: {}, additionalProperties: false },
     },
     table: {
-      tag: "table",
       identity: "stable",
-      properties: {},
       content: { mode: "element", allowedTags: ["card"] },
+      props: { type: "object", properties: {}, additionalProperties: false },
     },
     hand: {
-      tag: "hand",
       identity: "stable",
-      properties: { owner: { type: "string", required: true } },
-      regionOwnerProp: "owner",
       content: { mode: "element", allowedTags: ["card"] },
+      regionOwner: "owner",
+      props: {
+        type: "object",
+        properties: { owner: { type: "string" } },
+        required: ["owner"],
+        additionalProperties: false,
+      },
     },
     card: {
-      tag: "card",
       identity: "stable",
-      properties: {
-        rank: { type: "string", required: true },
-        suit: { type: "string", required: true },
-      },
       content: { mode: "none" },
+      props: {
+        type: "object",
+        properties: { rank: { type: "string" }, suit: { type: "string" } },
+        required: ["rank", "suit"],
+        additionalProperties: false,
+      },
     },
   },
 });

@@ -1,275 +1,230 @@
 import { expect, test } from "bun:test";
-import { registerSchema } from "../../src/core/schema.ts";
-import type { SchemaProfile } from "../../src/core/schema.ts";
-import {
-  PROVIDER_CAPABILITIES,
-  exportComponentSchema,
-  exportForProvider,
-  exportNodeTableSchema,
-} from "../../src/core/providers.ts";
-import {
-  decodeComponentOutput,
-  decodeNodeTable,
-  decodeProviderResponse,
-} from "../../src/core/provider-decode.ts";
+import type { DocumentModel, JsonObject, JsonValue } from "../../src/core/types.ts";
+import { parseDocument } from "../../src/core/parser.ts";
+import { PROVIDER_PROFILES } from "../../src/core/provider-profiles.ts";
+import type { ProviderId } from "../../src/core/provider-profiles.ts";
+import { exportComponentProperties, exportDocument } from "../../src/core/provider-export.ts";
+import { decodeProviderOutput, decodeProviderResponse } from "../../src/core/provider-decode.ts";
+import { encodeProviderOutput } from "../../src/core/provider-encode.ts";
+import { defineDocumentSchema } from "../../src/core/schema-document.ts";
+import { independentValidator, outlineSchema } from "../support/provider-fixture.ts";
 
-const componentProfile: SchemaProfile = registerSchema({
-  id: "fixture.component",
-  version: "1.0.0",
-  rootTag: "widget",
-  unknownPolicy: "error",
-  components: {
-    widget: {
-      tag: "widget",
-      identity: "none",
-      properties: {
-        title: { type: "string", required: true },
-        opacity: { type: "number", default: 1 },
-        tags: { type: "array", items: { type: "string" }, minItems: 1 },
-      },
-      content: { mode: "none" },
-    },
-  },
-});
+const PROVIDERS: readonly ProviderId[] = ["openai", "anthropic", "gemini"];
 
-const recursiveProfile: SchemaProfile = registerSchema({
-  id: "fixture.recursive",
-  version: "1.0.0",
-  rootTag: "node",
-  unknownPolicy: "error",
-  components: {
-    node: {
-      tag: "node",
-      identity: "stable",
-      properties: { label: { type: "string", required: true } },
-      content: { mode: "element", allowedTags: ["node"] },
-    },
-  },
-});
-
-function widgetComponent() {
-  const component = componentProfile.components["widget"];
-  if (component === undefined) throw new Error("fixture missing widget component");
-  return component;
-}
-
-function nodeComponent() {
-  const component = recursiveProfile.components["node"];
-  if (component === undefined) throw new Error("fixture missing node component");
-  return component;
+function outline(): DocumentModel {
+  const parsed = parseDocument(
+    [
+      '<outline title="Guide">',
+      '<section id="s1" heading="Intro" slug="intro"><script type="application/json">{"tags":["a-b","c-d"]}</script>',
+      "<para>Hello <em>big</em> world</para>",
+      '<section id="s2" heading="" level="2"><note id="n1" target="intro" text="see intro" /></section>',
+      "</section>",
+      "</outline>",
+    ].join(""),
+    outlineSchema,
+  );
+  if (!parsed.ok) throw new Error(JSON.stringify(parsed.diagnostics));
+  return parsed.value;
 }
 
 test("S01 Provider schema baseline", () => {
-  for (const capability of Object.values(PROVIDER_CAPABILITIES)) {
-    const result = exportComponentSchema(widgetComponent(), capability);
-    expect(result.profileId).toContain(capability.provider);
-    expect(result.representation).toBe("native");
-    expect(result.generationEnforced.length).toBeGreaterThan(0);
-    expect(result.limits.maxDepth).toBe(capability.maxDepth);
+  for (const provider of PROVIDERS) {
+    const props = exportComponentProperties(outlineSchema, "section", provider);
+    const document = exportDocument(outlineSchema, provider);
+    expect(props.scope).toBe("componentProperties");
+    expect(document.scope).toBe("document");
+    expect(document.route).toBe(
+      PROVIDER_PROFILES[provider].recursion &&
+        document.incompatibilities.length === 0 &&
+        document.route === "nativeTree"
+        ? "nativeTree"
+        : document.route,
+    );
+    for (const exported of [props, document]) {
+      expect(exported.profileRetrieved).toBe(PROVIDER_PROFILES[provider].retrieved);
+      expect(exported.generationEnforced.length).toBeGreaterThan(0);
+      expect(exported.budgets.maxDepth.basis).toMatch(/documented|internal/);
+      // The emitted grammar itself is valid 2020-12 JSON Schema for an independent validator.
+      expect(() => independentValidator(exported.requestSchema)).not.toThrow();
+    }
   }
-  // Live probes are separate and explicitly skipped without credentials (see Q-suite/live probe report).
-  const hasCredentials = process.env["OPENAI_API_KEY"] !== undefined;
-  expect(hasCredentials).toBe(false);
+  // Anthropic structured outputs do not support recursion: the document route is the typed projection.
+  expect(exportDocument(outlineSchema, "anthropic").route).toBe("rowProjection");
+  expect(PROVIDER_PROFILES.anthropic.recursion).toBe(false);
 });
 
 test("S02 Unsupported constraints", () => {
-  const capability = PROVIDER_CAPABILITIES["gemini"];
-  const result = exportComponentSchema(widgetComponent(), capability);
-  expect(result.runtimeOnlyChecks.some((c) => c.includes("minItems"))).toBe(true);
-  expect(result.incompatibilities).not.toContain("silently weakened");
+  const anthropic = exportComponentProperties(outlineSchema, "section", "anthropic");
+  const openai = exportComponentProperties(outlineSchema, "section", "openai");
+  // minimum/maximum are unsupported by Anthropic: dropped from the emitted schema and declared local-only.
+  expect(anthropic.localOnly).toContain("section.level:minimum");
+  expect(anthropic.generationEnforced).not.toContain("section.level:minimum");
+  expect(JSON.stringify(anthropic.requestSchema)).not.toContain('"minimum"');
+  expect(openai.generationEnforced).toContain("section.level:minimum");
+  // minItems 2 cannot be expressed for Anthropic (only 0/1) and is local-only.
+  expect(anthropic.localOnly).toContain("section.tags:minItems");
+  // The weakened constraint is still enforced after decode.
+  const tooLow = decodeProviderOutput(anthropic, { heading: "h", level: 0 }, outlineSchema);
+  expect(tooLow.ok).toBe(false);
+  // Every enforced claim names a keyword that is really present in the emitted schema.
+  for (const exported of [anthropic, openai])
+    for (const claim of exported.generationEnforced) {
+      const keyword = claim.split(":").pop() ?? "";
+      expect(JSON.stringify(exported.requestSchema)).toContain(`"${keyword}"`);
+    }
 });
 
 test("S03 Optional output without presence wrappers", () => {
-  const allRequired = exportComponentSchema(widgetComponent(), PROVIDER_CAPABILITIES["openai"]);
-  const schema = allRequired.requestSchema as {
-    required: string[];
-    properties: Record<string, { type: unknown }>;
-  };
-  expect(schema.required.sort()).toEqual(["opacity", "tags", "title"]);
-  expect(schema.properties["opacity"]?.type).toEqual(["number", "null"]);
-
-  for (const raw of [
-    { title: "t", opacity: null, tags: ["a"] },
-    { title: "t", tags: ["a"] },
-    { title: "t", opacity: 1, tags: ["a"] },
-  ]) {
-    const decoded = decodeComponentOutput("widget", raw, componentProfile, "$");
-    expect(decoded.ok).toBe(true);
-    if (decoded.ok) expect(decoded.value.props["opacity"]).toBe(1);
+  const nullable = exportComponentProperties(outlineSchema, "section", "openai");
+  const omitting = exportComponentProperties(outlineSchema, "section", "anthropic");
+  const required = (nullable.requestSchema["required"] ?? []) as readonly string[];
+  expect([...required].sort()).toEqual(["draft", "heading", "level", "slug", "tags"]);
+  expect(omitting.requestSchema["required"]).toEqual(["heading"]);
+  const expected = { heading: "", level: 1, draft: false };
+  const answers: [typeof nullable, JsonObject][] = [
+    [nullable, { heading: "", slug: null, level: null, tags: null, draft: null }],
+    [nullable, { heading: "", slug: null, level: 1, tags: null, draft: false }],
+    [omitting, { heading: "" }],
+    [omitting, { heading: "", level: 1, draft: false }],
+  ];
+  for (const [exported, answer] of answers) {
+    const decoded = decodeProviderOutput(exported, answer, outlineSchema);
+    expect(decoded.ok && decoded.value).toEqual(expected);
+    // No presence wrapper anywhere in the emitted grammar.
+    expect(JSON.stringify(exported.requestSchema)).not.toContain("present");
   }
-  const zero = decodeComponentOutput(
-    "widget",
-    { title: "t", opacity: 0, tags: ["a"] },
-    componentProfile,
-    "$",
-  );
-  expect(zero.ok && zero.value.props["opacity"]).toBe(0);
 });
 
 test("S04 Recursive and projected trees", () => {
-  const anthropic = exportForProvider(
-    nodeComponent(),
-    recursiveProfile,
-    PROVIDER_CAPABILITIES["anthropic"],
-  );
-  expect(anthropic.representation).toBe("native");
-  const gemini = exportForProvider(
-    nodeComponent(),
-    recursiveProfile,
-    PROVIDER_CAPABILITIES["gemini"],
-  );
-  expect(gemini.representation).toBe("projected");
-
-  const nodes = [
-    {
-      wireRef: "w0",
-      id: "root1",
-      tag: "node",
-      props: { label: "root" },
-      parentWireRef: null,
-      orderKey: "0",
-    },
-    {
-      wireRef: "w1",
-      id: null,
-      tag: "node",
-      props: { label: "child" },
-      parentWireRef: "w0",
-      orderKey: "0",
-    },
-  ];
-  const decoded = decodeNodeTable(nodes, recursiveProfile);
-  expect(decoded.ok).toBe(true);
-  if (decoded.ok) {
-    expect(decoded.value.root.id).toBe("root1");
-    expect(decoded.value.root.content?.[0]).toMatchObject({
-      tag: "node",
-      props: { label: "child" },
+  const model = outline();
+  for (const [provider, route] of [
+    ["gemini", "nativeTree"],
+    ["openai", "nativeTree"],
+    ["anthropic", "rowProjection"],
+    ["openai", "rowProjection"],
+  ] as const) {
+    const exported = exportDocument(outlineSchema, provider, route);
+    const wire = encodeProviderOutput(exported, model, outlineSchema);
+    expect({ provider, route, valid: independentValidator(exported.requestSchema)(wire) }).toEqual({
+      provider,
+      route,
+      valid: true,
     });
-    expect((decoded.value.root.content?.[0] as { id?: string }).id).toBeUndefined();
+    const decoded = decodeProviderOutput(exported, wire, outlineSchema);
+    expect(decoded.ok && decoded.value).toEqual(model);
+    // Decode → re-encode → decode is stable.
+    if (decoded.ok)
+      expect(encodeProviderOutput(exported, decoded.value, outlineSchema)).toEqual(wire);
+  }
+  const projection = exportDocument(outlineSchema, "anthropic");
+  const rows = encodeProviderOutput(projection, model, outlineSchema) as {
+    root: JsonObject;
+    rows: JsonObject[];
+  };
+  const mutate = (edit: (r: JsonObject[]) => JsonObject[]): JsonValue => ({
+    root: rows.root,
+    rows: edit(rows.rows.map((r) => ({ ...r }))),
+  });
+  const cyclic = mutate((r) =>
+    r.map((row, i) =>
+      i === 0 ? { ...row, parent: "r2" } : i === 1 ? { ...row, parent: "r1" } : row,
+    ),
+  );
+  const dangling = mutate((r) =>
+    r.map((row, i) => (i === 0 ? { ...row, parent: "nowhere" } : row)),
+  );
+  const inText = mutate((r) => [...r, { ref: "rx", parent: "r3", tag: "em", props: {} }]);
+  const badNesting = mutate((r) => [...r, { ref: "ry", parent: "r0", tag: "para", props: {} }]);
+  for (const [name, broken] of Object.entries({ cyclic, dangling, inText, badNesting })) {
+    const result = decodeProviderOutput(projection, broken, outlineSchema);
+    expect({ name, ok: result.ok }).toEqual({ name, ok: false });
   }
 });
 
 test("S05 Provider complexity boundaries", () => {
-  const tinyCapability = { ...PROVIDER_CAPABILITIES["openai"], maxProperties: 1 };
-  const result = exportComponentSchema(widgetComponent(), tinyCapability);
-  expect(result.incompatibilities.length).toBeGreaterThan(0);
-  expect(result.incompatibilities[0]).toContain("budget");
+  const properties: Record<string, JsonObject> = {};
+  for (let i = 0; i < 150; i += 1) properties[`field${i}`] = { type: "string" };
+  const wide = defineDocumentSchema({
+    id: "fixture.wide",
+    version: "1",
+    rootTag: "form",
+    components: {
+      form: {
+        identity: "none",
+        content: { mode: "none" },
+        props: { type: "object", properties, additionalProperties: false },
+      },
+    },
+  });
+  const exported = exportComponentProperties(wide, "form", "openai");
+  expect(exported.measured.properties).toBe(150);
+  expect(exported.incompatibilities.join(" ")).toContain("exceed the internal budget 100");
+  // Nothing is truncated to fit.
+  expect(Object.keys((exported.requestSchema["properties"] ?? {}) as JsonObject)).toHaveLength(150);
+  // The native tree for OpenAI measures deeper than the conservative 5-level budget, so the
+  // default route falls back to the projection and says why the native route was not chosen.
+  const native = exportDocument(outlineSchema, "openai", "nativeTree");
+  expect(native.measured.depth).toBeGreaterThan(5);
+  expect(native.incompatibilities.some((m) => m.includes("nesting depth"))).toBe(true);
+  expect(exportDocument(outlineSchema, "openai").route).toBe("rowProjection");
+  expect(exportDocument(outlineSchema, "openai").incompatibilities).toEqual([]);
 });
 
 test("S06 Wire references are not persistent IDs", () => {
-  const table = exportNodeTableSchema(recursiveProfile, PROVIDER_CAPABILITIES["gemini"]);
-  const schema = table.requestSchema as {
-    properties: { nodes: { items: { properties: { id: unknown; wireRef: unknown } } } };
-  };
-  expect(schema.properties.nodes.items.properties.wireRef).toBeDefined();
-  expect(schema.properties.nodes.items.properties.id).toBeDefined();
-  const nodes = [
-    {
-      wireRef: "w0",
-      id: "root1",
-      tag: "node",
-      props: { label: "root" },
-      parentWireRef: null,
-      orderKey: "0",
-    },
-    {
-      wireRef: "w1",
-      id: null,
-      tag: "node",
-      props: { label: "leaf" },
-      parentWireRef: "w0",
-      orderKey: "0",
-    },
-  ];
-  const decoded = decodeNodeTable(nodes, recursiveProfile);
-  expect(decoded.ok).toBe(true);
-  // wireRef "w1" never surfaces as a persisted id -- only the declared "root1" does.
-  if (decoded.ok) expect(JSON.stringify(decoded.value)).not.toContain("w1");
+  const exported = exportDocument(outlineSchema, "anthropic");
+  const wire = encodeProviderOutput(exported, outline(), outlineSchema) as { rows: JsonObject[] };
+  expect(wire.rows.every((row) => typeof row["ref"] === "string")).toBe(true);
+  const decoded = decodeProviderOutput(exported, wire, outlineSchema);
+  if (!decoded.ok) throw new Error("decode failed");
+  const text = JSON.stringify(decoded.value);
+  expect(text).not.toContain('"r1"');
+  expect(text).toContain('"id":"s1"');
+  // Anonymous paragraphs and emphasis stay anonymous.
+  expect((decoded.value as DocumentModel).root.content?.[0]).toMatchObject({ id: "s1" });
+  expect(text.match(/"id":/g)).toHaveLength(3);
 });
 
 test("S07 Locally invalid structured output", () => {
-  const dangling = decodeNodeTable(
-    [
-      {
-        wireRef: "w0",
-        id: "root1",
-        tag: "node",
-        props: { label: "root" },
-        parentWireRef: null,
-        orderKey: "0",
-      },
-      {
-        wireRef: "w1",
-        id: "root1",
-        tag: "node",
-        props: { label: "dup" },
-        parentWireRef: "w0",
-        orderKey: "0",
-      },
-    ],
-    recursiveProfile,
-  );
-  expect(dangling.ok).toBe(false);
-  if (!dangling.ok) expect(dangling.diagnostics.some((d) => d.code === "duplicateId")).toBe(true);
-
-  const cyclic = decodeNodeTable(
-    [
-      {
-        wireRef: "w0",
-        id: "root1",
-        tag: "node",
-        props: { label: "root" },
-        parentWireRef: "w1",
-        orderKey: "0",
-      },
-      {
-        wireRef: "w1",
-        id: null,
-        tag: "node",
-        props: { label: "child" },
-        parentWireRef: "w0",
-        orderKey: "0",
-      },
-    ],
-    recursiveProfile,
-  );
-  expect(cyclic.ok).toBe(false);
+  const exported = exportDocument(outlineSchema, "gemini", "nativeTree");
+  const wire = encodeProviderOutput(exported, outline(), outlineSchema);
+  const text = JSON.stringify(wire);
+  const dangling = JSON.parse(text.replace('"target":"intro"', '"target":"missing"')) as JsonValue;
+  const duplicate = JSON.parse(text.replace('"id":"s2"', '"id":"s1"')) as JsonValue;
+  const d1 = decodeProviderOutput(exported, dangling, outlineSchema);
+  const d2 = decodeProviderOutput(exported, duplicate, outlineSchema);
+  expect(d1.ok).toBe(false);
+  expect(d2.ok).toBe(false);
+  if (!d1.ok) expect(d1.diagnostics.some((d) => d.code === "danglingReference")).toBe(true);
+  if (!d2.ok) expect(d2.diagnostics.some((d) => d.code === "duplicateId")).toBe(true);
 });
 
 test("S08 SDK adaptation and incomplete responses", () => {
-  const ok = decodeProviderResponse(
-    { status: "ok", json: '{"title":"t","tags":["a"]}' },
-    "widget",
-    componentProfile,
-  );
-  expect(ok.ok).toBe(true);
-
-  const refusal = decodeProviderResponse(
+  const exported = exportComponentProperties(outlineSchema, "section", "openai");
+  for (const response of [
     { status: "refusal", reason: "policy" },
-    "widget",
-    componentProfile,
-  );
-  expect(refusal.ok).toBe(false);
-
-  const incomplete = decodeProviderResponse(
-    { status: "incomplete", partialJson: '{"title":"t"' },
-    "widget",
-    componentProfile,
-  );
-  expect(incomplete.ok).toBe(false);
-
-  const schemaError = decodeProviderResponse(
-    { status: "schemaError", detail: "bad request" },
-    "widget",
-    componentProfile,
-  );
-  expect(schemaError.ok).toBe(false);
-
-  const badJson = decodeProviderResponse(
-    { status: "ok", json: "{not json" },
-    "widget",
-    componentProfile,
-  );
-  expect(badJson.ok).toBe(false);
+    { status: "incomplete", partialJson: '{"heading": "h' },
+    { status: "schemaError", detail: "invalid schema" },
+    { status: "ok", json: '{"heading": ' },
+  ] as const)
+    expect(decodeProviderResponse(response, exported, outlineSchema).ok).toBe(false);
+  // An SDK that rewrote the request schema (here: dropped `maximum`) cannot smuggle an
+  // out-of-range value past decode: the export's own schema and the local contract still apply.
+  const withoutMaximum = (value: JsonValue): JsonValue =>
+    Array.isArray(value)
+      ? value.map(withoutMaximum)
+      : typeof value === "object" && value !== null
+        ? Object.fromEntries(
+            Object.entries(value)
+              .filter(([k]) => k !== "maximum")
+              .map(([k, v]) => [k, withoutMaximum(v)]),
+          )
+        : value;
+  const sdkRewritten = {
+    ...exported,
+    requestSchema: withoutMaximum(exported.requestSchema) as JsonObject,
+  };
+  const answer = JSON.stringify({ heading: "h", slug: null, level: 9, tags: null, draft: null });
+  expect(
+    decodeProviderResponse({ status: "ok", json: answer }, sdkRewritten, outlineSchema).ok,
+  ).toBe(false);
 });

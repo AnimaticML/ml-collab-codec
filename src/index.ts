@@ -12,22 +12,43 @@ export type { Diagnostic, DiagnosticCode, SourceSpan, Result } from "./core/diag
 export { DiagnosticError, ok, err } from "./core/diagnostics.ts";
 
 export type {
-  PropertyType,
-  PropertySchema,
+  AdditionalPolicy,
   ComponentSchema,
   ContentMode,
+  PropertySchema,
   SchemaProfile,
+  ValueType,
 } from "./core/schema.ts";
-export { registerSchema, getComponentSchema } from "./core/schema.ts";
+export { getComponentSchema } from "./core/schema.ts";
+export type {
+  ComponentDefinition,
+  DocumentSchemaDefinition,
+  JsonSchema,
+} from "./core/schema-definition.ts";
+export { SUPPORTED_KEYWORDS, SCHEMA_LIMITS } from "./core/schema-definition.ts";
+export { defineDocumentSchema } from "./core/schema-document.ts";
+export type {
+  LegacyComponentSchema,
+  LegacyPropertySchema,
+  LegacySchemaProfile,
+} from "./core/schema-legacy.ts";
+export { migrateLegacySchema, registerSchema } from "./core/schema-legacy.ts";
 
-export { normalizeProperties, normalizeComponentProps, deepEqual } from "./core/normalize.ts";
+export { normalizeComponentProps, deepEqual } from "./core/normalize.ts";
+export type { EditableDocument, EditableNode, MutableJsonValue } from "./core/json-copy.ts";
+export { editableCopy } from "./core/json-copy.ts";
 export { attributeNameToProperty } from "./core/naming.ts";
 
-export type { ParseOptions } from "./core/parser.ts";
 export { parseDocument, parseFragment, parseMultiRoot } from "./core/parser.ts";
 export { serializeDocument, serializeFragment } from "./core/serializer.ts";
 
-export { validateDocument } from "./core/validate.ts";
+export {
+  decodeDocumentJson,
+  normalizeDocument,
+  validateDocument,
+  DOCUMENT_LIMITS,
+} from "./core/document-check.ts";
+export { validateTable } from "./core/validate.ts";
 export type { Located } from "./core/address.ts";
 export { findNodeById } from "./core/address.ts";
 
@@ -44,7 +65,13 @@ export {
 export type { PropPath } from "./core/json-path.ts";
 
 export type { Change, ChangeKind, Origin, SubtreeRecord } from "./core/change.ts";
-export { invertChange, invertChanges, compareOrigin, OPERATION_FORMAT } from "./core/change.ts";
+export {
+  CHANGE_KINDS,
+  invertChange,
+  invertChanges,
+  compareOrigin,
+  OPERATION_FORMAT,
+} from "./core/change.ts";
 export { canonicalJson, decodeChanges, DecodeError } from "./core/change-codec.ts";
 export { applyChanges } from "./core/apply.ts";
 export { ApplyError } from "./core/staging.ts";
@@ -93,7 +120,7 @@ export type {
 } from "./core/authority.ts";
 export { Authority, StaleDecisionError, recordOf } from "./core/authority.ts";
 export type { CandidateValidator } from "./core/invariants.ts";
-export { schemaInvariants } from "./core/invariants.ts";
+export { schemaValidator } from "./core/invariants.ts";
 export type { CheckpointBundle } from "./core/checkpoint.ts";
 export {
   exportCheckpoint,
@@ -138,19 +165,13 @@ export { ClassProjection } from "./runtime/projection.ts";
 export type { Selector } from "./runtime/selector.ts";
 export { createSelector } from "./runtime/selector.ts";
 
-export type { ProviderCapability, ExportResult } from "./core/providers.ts";
-export {
-  PROVIDER_CAPABILITIES,
-  exportComponentSchema,
-  exportNodeTableSchema,
-  exportForProvider,
-} from "./core/providers.ts";
+export type { Budget, ProviderId, ProviderProfile } from "./core/provider-profiles.ts";
+export { PROVIDER_PROFILES } from "./core/provider-profiles.ts";
+export type { ProviderExport } from "./core/provider-export.ts";
+export { exportComponentProperties, exportDocument } from "./core/provider-export.ts";
 export type { ProviderResponse } from "./core/provider-decode.ts";
-export {
-  decodeComponentOutput,
-  decodeNodeTable,
-  decodeProviderResponse,
-} from "./core/provider-decode.ts";
+export { decodeProviderOutput, decodeProviderResponse } from "./core/provider-decode.ts";
+export { encodeProviderOutput } from "./core/provider-encode.ts";
 
 export {
   PUBLIC_REGION,

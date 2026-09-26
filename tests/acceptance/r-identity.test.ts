@@ -13,7 +13,7 @@ import {
   SequenceAllocator,
 } from "../../src/core/identity.ts";
 import type { AllocatorState, AllocatorStore } from "../../src/core/identity.ts";
-import { schemaInvariants } from "../../src/core/invariants.ts";
+import { schemaValidator } from "../../src/core/invariants.ts";
 import { decodeRequest, ProtocolError } from "../../src/core/protocol.ts";
 import { isConflict, transformPair } from "../../src/core/transform.ts";
 import { ROOT_ID, textOf } from "../../src/core/table.ts";
@@ -334,7 +334,7 @@ describe("R45–R49 identity, context, placement, and finality", () => {
   test("R49 Invariant and incompatible-write outcomes remain final", () => {
     const base = listDoc({ items: ["a", "b"], x: 0 });
     const decide = (first: "a" | "b") => {
-      const room = new Room(base, { validators: [schemaInvariants(listSchema)] });
+      const room = new Room(base, { validators: [schemaValidator(listSchema)] });
       const low = room.join("low", "replica-a");
       const high = room.join("high", "replica-b");
       const watcher = room.join("watch", "replica-w");

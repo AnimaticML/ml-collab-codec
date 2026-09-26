@@ -201,6 +201,8 @@ function decodeStructuralChange(kind: string, f: Fields): Change | undefined {
         gap: f.int("gap"),
         origin,
       };
+    case "setTag":
+      return { kind, node: f.str("node"), before: f.str("before"), after: f.str("after"), origin };
     case "split":
     case "merge":
       return {
@@ -241,7 +243,7 @@ function decodeOne(value: unknown, path: string): Change {
   return decoded;
 }
 
-/** Strictly decode serialized primitives (`sdl.ops/1`); incomplete or unknown records are errors, never guessed. */
+/** Strictly decode serialized primitives (`sdl.ops/2`); incomplete or unknown records are errors, never guessed. */
 export function decodeChanges(value: unknown, path = "changes", limit = 10_000): Change[] {
   if (!Array.isArray(value)) throw new DecodeError(path, "expected an array of primitives");
   if (value.length > limit) throw new DecodeError(path, `more than ${limit} primitives`);

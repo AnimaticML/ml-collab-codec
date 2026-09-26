@@ -1,4 +1,5 @@
 import type { JsonObject, JsonValue } from "./types.ts";
+import { isJsonObject } from "./types.ts";
 import { type Diagnostic, diag } from "./diagnostics.ts";
 
 const UNSAFE_KEYS = new Set(["__proto__", "prototype", "constructor"]);
@@ -51,14 +52,18 @@ export class PropsBuilder {
           this.diagnostics.push(diag("unsafeKey", path, `JSON key is unsafe: ${key}`));
           continue;
         }
-        this.root[key] = mergeValue(this.root[key], item);
+        this.root[key] = mergeValue(this.root[key], item, (bad) => this.unsafe(path, bad));
       }
       return;
     }
     const container = this.ensureObjectPath(this.root, target.slice(0, -1), path);
     if (container === null) return;
     const leaf = target[target.length - 1] as string;
-    container[leaf] = mergeValue(container[leaf], value);
+    container[leaf] = mergeValue(container[leaf], value, (bad) => this.unsafe(path, bad));
+  }
+
+  private unsafe(path: string, key: string): void {
+    this.diagnostics.push(diag("unsafeKey", path, `JSON key is unsafe: ${key}`));
   }
 
   build(): JsonObject {
@@ -131,22 +136,16 @@ export class PropsBuilder {
   }
 }
 
-function mergeValue(existing: JsonValue | undefined, incoming: JsonValue): JsonValue {
-  if (
-    existing !== undefined &&
-    typeof existing === "object" &&
-    existing !== null &&
-    !Array.isArray(existing) &&
-    typeof incoming === "object" &&
-    incoming !== null &&
-    !Array.isArray(incoming)
-  ) {
-    const merged: Record<string, JsonValue> = { ...existing };
-    for (const [key, value] of Object.entries(incoming)) {
-      if (UNSAFE_KEYS.has(key)) continue;
-      merged[key] = mergeValue(merged[key], value);
-    }
-    return merged;
+function mergeValue(
+  existing: JsonValue | undefined,
+  incoming: JsonValue,
+  onUnsafe: (key: string) => void,
+): JsonValue {
+  if (!isJsonObject(existing) || !isJsonObject(incoming)) return incoming;
+  const merged: Record<string, JsonValue> = { ...existing };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (UNSAFE_KEYS.has(key)) onUnsafe(key);
+    else merged[key] = mergeValue(merged[key], value, onUnsafe);
   }
-  return incoming;
+  return merged;
 }

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { expect, test } from "bun:test";
-import { registerSchema } from "../../src/core/schema.ts";
+import { registerSchema } from "../../src/core/schema-legacy.ts";
 import { parseDocument } from "../../src/core/parser.ts";
 import { serializeDocument } from "../../src/core/serializer.ts";
 import { applyChanges } from "../../src/core/apply.ts";

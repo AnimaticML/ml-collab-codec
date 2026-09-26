@@ -1,8 +1,9 @@
+import { isJsonArray } from "../../src/core/types.ts";
 import type { Change } from "../../src/core/change.ts";
 import { ChangeBuilder } from "../../src/core/builder.ts";
 import type { Table, TableNode } from "../../src/core/table.ts";
 import { makeRow, ROOT_ID, TEXT_TAG, textOf } from "../../src/core/table.ts";
-import type { JsonValue } from "../../src/core/types.ts";
+import type { JsonObject, JsonValue } from "../../src/core/types.ts";
 import type { Rng } from "./random.ts";
 
 /** Canonical comparable form of a table (row order independent). */
@@ -76,12 +77,12 @@ function arrayTargets(table: Table): { node: string; path: (string | number)[]; 
           typeof item === "object" &&
           item !== null &&
           !Array.isArray(item) &&
-          Array.isArray(item["tags"])
+          isJsonArray((item as JsonObject)["tags"])
         )
           out.push({
             node: row.id,
             path: [key, i, "tags"],
-            length: (item["tags"] as unknown[]).length,
+            length: ((item as JsonObject)["tags"] as readonly JsonValue[]).length,
           });
       });
     }

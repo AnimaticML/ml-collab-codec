@@ -1,3 +1,4 @@
+import { isJsonArray } from "./types.ts";
 import type { JsonValue } from "./types.ts";
 import type { Change, ChangeOf } from "./change.ts";
 import { codePointLength } from "./change.ts";
@@ -61,7 +62,7 @@ function applyDelta(staged: StagedTable, change: ChangeOf<"delta">): void {
 
 function readArray(row: TableNode, path: PropPath): readonly JsonValue[] {
   const value = getAtPath(row.props, path);
-  if (!Array.isArray(value)) throw new ApplyError("preconditionFailed", "target is not an array");
+  if (!isJsonArray(value)) throw new ApplyError("preconditionFailed", "target is not an array");
   return value;
 }
 

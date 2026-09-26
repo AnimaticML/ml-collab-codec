@@ -25,6 +25,12 @@ export interface ChangeSummary {
     readonly from: string | null;
     readonly to: string | null;
   }[];
+  /** Nodes whose type (tag) changed while keeping their identity. */
+  readonly retagged: readonly {
+    readonly node: string;
+    readonly from: string;
+    readonly to: string;
+  }[];
 }
 
 export function isEmptySummary(summary: ChangeSummary): boolean {
@@ -34,7 +40,8 @@ export function isEmptySummary(summary: ChangeSummary): boolean {
       summary.props.length +
       summary.text.length +
       summary.children.length +
-      summary.moved.length ===
+      summary.moved.length +
+      summary.retagged.length ===
     0
   );
 }
@@ -105,6 +112,7 @@ export function summarize(
     text: [] as string[],
     children: [] as string[],
     moved: [] as { node: string; from: string | null; to: string | null }[],
+    retagged: [] as { node: string; from: string; to: string }[],
   };
   for (const id of ids) {
     const before = previous.get(id);
@@ -113,6 +121,8 @@ export function summarize(
     if (before === undefined) summary.created.push(id);
     else if (after === undefined) summary.deleted.push(id);
     else {
+      if (before.tag !== after.tag)
+        summary.retagged.push({ node: id, from: before.tag, to: after.tag });
       if (before.parentId !== after.parentId)
         summary.moved.push({ node: id, from: before.parentId, to: after.parentId });
       if (before.children.join("\u0000") !== after.children.join("\u0000"))

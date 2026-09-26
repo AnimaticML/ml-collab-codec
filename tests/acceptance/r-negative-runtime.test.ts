@@ -252,6 +252,7 @@ describe("R33 negative controls: history, publication, and runtime faults are de
           text: [],
           children: [],
           moved: [],
+          retagged: [],
         });
         current = next;
         scheduler.frame();
@@ -288,6 +289,7 @@ describe("R33 negative controls: history, publication, and runtime faults are de
         text: ["t"],
         children: [],
         moved: [],
+        retagged: [],
       });
       graph.read("layout");
       jobs[0]?.("stale-for-one");

@@ -27,7 +27,7 @@ interface Base {
 }
 
 /**
- * One self-contained reversible primitive (operation format `sdl.ops/1`).
+ * One self-contained reversible primitive (operation format `sdl.ops/2`).
  * Every field needed to invert the record is inside the record; before
  * values and removed payloads double as checked preconditions. Positions are
  * code points (text), element indexes (arrays), or child indexes; a `gap`
@@ -94,7 +94,14 @@ export type Change =
       readonly gap: number;
     })
   | (Base & SplitShape & { readonly kind: "split" })
-  | (Base & SplitShape & { readonly kind: "merge" });
+  | (Base & SplitShape & { readonly kind: "merge" })
+  | (Base & {
+      /** Same-identity type change (for example paragraph → heading); `before` is a checked precondition. */
+      readonly kind: "setTag";
+      readonly node: string;
+      readonly before: string;
+      readonly after: string;
+    });
 
 interface ArrayTarget {
   readonly node: string;
@@ -111,9 +118,26 @@ interface SplitShape {
 }
 
 export type ChangeKind = Change["kind"];
+
+/** Every primitive kind of the operation algebra (the transform-pair inventory is checked against this). */
+export const CHANGE_KINDS: readonly ChangeKind[] = [
+  "set",
+  "delta",
+  "arrayInsert",
+  "arrayDelete",
+  "arrayMove",
+  "textInsert",
+  "textDelete",
+  "nodeInsert",
+  "nodeDelete",
+  "nodeMove",
+  "split",
+  "merge",
+  "setTag",
+];
 export type ChangeOf<K extends ChangeKind> = Extract<Change, { kind: K }>;
 
-export const OPERATION_FORMAT = "sdl.ops/1";
+export const OPERATION_FORMAT = "sdl.ops/2";
 
 export function codePointLength(text: string): number {
   return Array.from(text).length;
@@ -164,6 +188,8 @@ export function invertChange(change: Change): Change {
       return { ...change, kind: "merge" };
     case "merge":
       return { ...change, kind: "split" };
+    case "setTag":
+      return { ...change, before: change.after, after: change.before };
   }
 }
 

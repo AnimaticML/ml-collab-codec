@@ -1,86 +1,75 @@
-import type { ContentItem, DocumentModel } from "./types.ts";
+import type { ComponentNode, ContentItem, DocumentModel } from "./types.ts";
 import type { SchemaProfile } from "./schema.ts";
 import { type Diagnostic, type Result, diag, err, ok } from "./diagnostics.ts";
 import { tokenize } from "./tokenizer.ts";
 import { buildFragment } from "./build.ts";
+import { normalizeDocument, normalizeFragment } from "./document-check.ts";
 
 /** Only nonfatal, precedence-preserving diagnostics may accompany a successful parse. */
 function isFatal(d: Diagnostic): boolean {
   return d.code !== "duplicateAttribute";
 }
 
-export interface ParseOptions {
-  /** "single" (default): exactly one root component. "multi": all roots retained. */
-  readonly rootMode?: "single" | "multi";
-}
-
-/** Parse tagged source into ordered top-level content items, schema-validated. */
-export function parseFragment(
+function decode(
   source: string,
   profile: SchemaProfile,
-): { items: readonly ContentItem[]; diagnostics: readonly Diagnostic[] } {
+): { items: readonly unknown[]; diagnostics: Diagnostic[] } {
   const tokenized = tokenize(source);
   const built = buildFragment(tokenized.nodes, profile, "$");
   return { items: built.items, diagnostics: [...tokenized.diagnostics, ...built.diagnostics] };
 }
 
-function isBlankText(item: ContentItem): boolean {
-  return typeof item === "string" && item.trim().length === 0;
-}
-
-/** Parse a full document: schema-validated, defaulting to single-root mode. */
-export function parseDocument(
+/**
+ * Parse top-level content that may mix text and components of any declared
+ * tag (for example a clipboard fragment). Not a document: no root rule.
+ */
+export function parseFragment(
   source: string,
   profile: SchemaProfile,
-  options: ParseOptions = {},
-): Result<DocumentModel> {
-  const rootMode = options.rootMode ?? "single";
-  const fragment = parseFragment(source, profile);
-  const diagnostics = [...fragment.diagnostics];
-  const roots = fragment.items.filter(
-    (item): item is Exclude<ContentItem, string> => typeof item !== "string",
-  );
-  const strayText = fragment.items.filter((item) => !isBlankText(item) && typeof item === "string");
-
-  if (rootMode === "single") {
-    if (roots.length === 0) {
-      diagnostics.push(diag("invalidNesting", "$", "document has no root component"));
-      return err(diagnostics);
-    }
-    if (roots.length > 1 || strayText.length > 0) {
-      diagnostics.push(
-        diag("extraRoot", "$", "single-root mode allows exactly one top-level component"),
-      );
-      return err(diagnostics);
-    }
-    const root = roots[0];
-    if (root === undefined || root.tag !== profile.rootTag) {
-      diagnostics.push(diag("invalidValue", "$", `root must be <${profile.rootTag}>`));
-      return err(diagnostics);
-    }
-    if (diagnostics.some(isFatal)) return err(diagnostics);
-    return ok({ schemaId: profile.id, schemaVersion: profile.version, root }, diagnostics);
-  }
-
-  if (roots.length === 0) {
-    diagnostics.push(diag("invalidNesting", "$", "document has no root component"));
-    return err(diagnostics);
-  }
-  if (diagnostics.some(isFatal)) return err(diagnostics);
-  const first = roots[0];
-  if (first === undefined) return err(diagnostics);
-  return ok({ schemaId: profile.id, schemaVersion: profile.version, root: first }, diagnostics);
+): Result<readonly ContentItem[]> {
+  const decoded = decode(source, profile);
+  const normalized = normalizeFragment(decoded.items, profile, true);
+  const diagnostics = [...decoded.diagnostics, ...normalized.diagnostics];
+  return diagnostics.some(isFatal) ? err(diagnostics) : ok(normalized.items, diagnostics);
 }
 
-/** Multi-root parse returning every top-level component, for explicit multi-root/container use. */
+/** Parse a document: exactly one root component of the schema's root tag, nothing else. */
+export function parseDocument(source: string, profile: SchemaProfile): Result<DocumentModel> {
+  const decoded = decode(source, profile);
+  const roots = decoded.items.filter((item) => typeof item !== "string");
+  const text = decoded.items.filter((item) => typeof item === "string" && item.trim().length > 0);
+  if (roots.length !== 1 || text.length > 0) {
+    const message =
+      roots.length === 0
+        ? "document has no root component"
+        : "a document has exactly one top-level component and no top-level text";
+    return err([
+      ...decoded.diagnostics,
+      diag(roots.length === 0 ? "invalidNesting" : "extraRoot", "$", message),
+    ]);
+  }
+  const normalized = normalizeDocument(roots[0], profile);
+  const diagnostics = [...decoded.diagnostics, ...normalized.diagnostics];
+  if (normalized.root === undefined || diagnostics.some(isFatal)) return err(diagnostics);
+  return ok(
+    { schemaId: profile.id, schemaVersion: profile.version, root: normalized.root },
+    diagnostics,
+  );
+}
+
+/**
+ * Parse a multi-root container: returns every top-level component, in
+ * order, with one shared id space. Significant top-level text is an error
+ * rather than being dropped.
+ */
 export function parseMultiRoot(
   source: string,
   profile: SchemaProfile,
-): Result<readonly Exclude<ContentItem, string>[]> {
-  const fragment = parseFragment(source, profile);
-  const roots = fragment.items.filter(
-    (item): item is Exclude<ContentItem, string> => typeof item !== "string",
-  );
-  if (fragment.diagnostics.some(isFatal)) return err(fragment.diagnostics);
-  return ok(roots, fragment.diagnostics);
+): Result<readonly ComponentNode[]> {
+  const decoded = decode(source, profile);
+  const normalized = normalizeFragment(decoded.items, profile, false);
+  const diagnostics = [...decoded.diagnostics, ...normalized.diagnostics];
+  const roots = normalized.items.filter((item): item is ComponentNode => typeof item !== "string");
+  if (roots.length === 0) diagnostics.push(diag("invalidNesting", "$", "no top-level component"));
+  return diagnostics.some(isFatal) ? err(diagnostics) : ok(roots, diagnostics);
 }

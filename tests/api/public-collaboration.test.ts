@@ -9,6 +9,7 @@ import {
   AuthorityHost,
   canonicalJson,
   CHECKPOINT_FORMAT,
+  CHANGE_KINDS,
   ChangeBuilder,
   CheckpointError,
   children,
@@ -51,7 +52,7 @@ import {
   requestKey,
   restoreAuthority,
   ROOT_ID,
-  schemaInvariants,
+  schemaValidator,
   SequenceAllocator,
   splitContainer,
   StaleDecisionError,
@@ -247,7 +248,8 @@ test("public API: records, builders, transforms, and composition", () => {
   expect(() => decodeChanges([{ kind: "nope" }])).toThrow(DecodeError);
   expect(new TransformLimitError("x")).toBeInstanceOf(Error);
   expect(canonicalJson({ b: 1, a: 2 })).toBe('{"a":2,"b":1}');
-  expect(OPERATION_FORMAT).toBe("sdl.ops/1");
+  expect(OPERATION_FORMAT).toBe("sdl.ops/2");
+  expect(CHANGE_KINDS).toContain("setTag");
 });
 
 test("public API: identity, protocol, authority, host, and checkpoints", () => {
@@ -257,7 +259,7 @@ test("public API: identity, protocol, authority, host, and checkpoints", () => {
   expect(isReplicaId(allocator.replica) && allocator.next()).toBe(1);
   expect(() => SequenceAllocator.ephemeral("x", MAX_SEQUENCE).next()).toThrow(IdentityError);
   const table = base();
-  const validators: CandidateValidator[] = [schemaInvariants(schema)];
+  const validators: CandidateValidator[] = [schemaValidator(schema)];
   const authorize: Authorizer = (actor) => actor !== "blocked";
   const options: AuthorityOptions = { validators, authorize };
   const auth = Authority.create("doc", "epoch", table, options);

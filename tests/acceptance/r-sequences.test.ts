@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Authority } from "../../src/core/authority.ts";
 import type { Decision } from "../../src/core/authority.ts";
 import { applyChanges } from "../../src/core/apply.ts";
-import { schemaInvariants } from "../../src/core/invariants.ts";
+import { schemaValidator } from "../../src/core/invariants.ts";
 import { ProtocolError } from "../../src/core/protocol.ts";
 import { isConflict, transformPair } from "../../src/core/transform.ts";
 import { ROOT_ID, textOf } from "../../src/core/table.ts";
@@ -20,7 +20,7 @@ function authority(table: Table, validated = false): Authority {
     DOC,
     EPOCH,
     table,
-    validated ? { validators: [schemaInvariants(listSchema)] } : {},
+    validated ? { validators: [schemaValidator(listSchema)] } : {},
   );
 }
 
