@@ -30,6 +30,7 @@ import { FakeStore } from "../support/fake-store.ts";
 import { tableFrom } from "../support/gen.ts";
 import { build, envelope } from "../support/requests.ts";
 import { DOC, EPOCH, Room } from "../support/room.ts";
+import { rejection } from "../support/async.ts";
 
 const SCHEMA = { id: "fixture.list", version: "1.0.0" };
 const SCHEMA_RICH = { id: "fixture.rich-text", version: "1.0.0" };
@@ -225,7 +226,7 @@ describe("R35–R40 control, reversible records, checkpoints, and composition po
     expect(bare.transitionsSince(bare.getRevision() - 1)).toBeUndefined();
   });
 
-  test("R38 Retained undo/redo survives checkpoint truncation and restart", () => {
+  test("R38 Retained undo/redo survives checkpoint truncation and restart", async () => {
     const room = new Room(listDoc({ title: "t", x: 0, note: "n" }));
     const own = room.join("own", "replica-o", "alice", { undoLimit: 3 });
     const other = room.join("other", "replica-r", "bob");
@@ -240,17 +241,17 @@ describe("R35–R40 control, reversible records, checkpoints, and composition po
     room.settle();
     if (old.status !== "applied") throw new Error("setup");
     const store = new FakeStore();
-    const host = AuthorityHost.open(
+    const host = await AuthorityHost.open(
       store,
       SCHEMA,
       () => new Authority(room.authority.exportState()),
     );
-    host.checkpoint(0); // V: prefix transforms deleted
+    await host.checkpoint(0); // V: prefix transforms deleted
     const session = own.exportSession();
-    expect(store.read().checkpoint?.transitions).toEqual([]);
+    expect((await store.read()).checkpoint?.transitions).toEqual([]);
 
     // Restart: only checkpoint + tail + the locally saved session.
-    const restarted = AuthorityHost.open(store, SCHEMA, () => {
+    const restarted = await AuthorityHost.open(store, SCHEMA, () => {
       throw new Error("no genesis replay");
     });
     const revived = new Client({
@@ -271,10 +272,10 @@ describe("R35–R40 control, reversible records, checkpoints, and composition po
       table: restarted.authority.getTable(),
       revision: restarted.authority.getRevision(),
     });
-    const sendFrom = (client: Client, actor: string) => {
+    const sendFrom = async (client: Client, actor: string) => {
       const request = client.nextRequest();
       if (request === undefined) return;
-      const decision = restarted.submit(request, { actor });
+      const decision = await restarted.submit(request, { actor });
       if (decision.kind !== "decided") throw new Error("resync");
       const events =
         decision.transition === undefined
@@ -285,34 +286,34 @@ describe("R35–R40 control, reversible records, checkpoints, and composition po
         if (peer !== client && decision.transition !== undefined) peer.receive(decision.transition);
     };
     bob.transact((w) => w.set(ROOT_ID, "note", "after restart"));
-    sendFrom(bob, "bob");
+    await sendFrom(bob, "bob");
     expect(revived.redo().status).toBe("requested");
-    sendFrom(revived, "alice");
+    await sendFrom(revived, "alice");
     expect(restarted.authority.getTable().get(ROOT_ID)?.props).toEqual({
       title: "mine",
       x: 1,
       note: "after restart",
     });
     expect(revived.undo(old.group).status).toBe("requested");
-    sendFrom(revived, "alice");
+    await sendFrom(revived, "alice");
     expect(restarted.authority.getTable().get(ROOT_ID)?.props["title"]).toBe("t");
     // A superseding absolute write still conflicts after the original log entries are gone.
     bob.transact((w) => w.set(ROOT_ID, "x", 5));
-    sendFrom(bob, "bob");
+    await sendFrom(bob, "bob");
     expect(revived.undo().status).toBe("conflict");
     // An expired group reports unavailable instead of fetching a deleted prefix.
     for (let i = 0; i < 4; i += 1) {
       revived.closeGroup();
       revived.transact((w) => w.set(ROOT_ID, "note", `n${i}`));
-      sendFrom(revived, "alice");
+      await sendFrom(revived, "alice");
     }
     expect(revived.undo(old.group).status).toBe("unavailable");
   });
 
-  test("R39 Checkpoint cut, failure, and deduplication", () => {
+  test("R39 Checkpoint cut, failure, and deduplication", async () => {
     for (const interrupt of ["stage", "publish", "prune"] as const) {
       const store = new FakeStore();
-      const host = AuthorityHost.open(store, SCHEMA, () =>
+      const host = await AuthorityHost.open(store, SCHEMA, () =>
         Authority.create(DOC, EPOCH, listDoc({ items: ["a", "b"], count: 1 })),
       );
       const base = host.authority.getTable();
@@ -322,10 +323,10 @@ describe("R35–R40 control, reversible records, checkpoints, and composition po
         0,
         build(base, "replica-a", 1, (w) => w.delta(ROOT_ID, "count", 5)),
       );
-      host.submit(delta, { actor: "a" });
-      store.interrupt = interrupt;
-      expect(() => host.checkpoint(0)).toThrow();
-      store.interrupt = undefined;
+      await host.submit(delta, { actor: "a" });
+      store.hooks = { fail: (step) => (step === interrupt ? "before" : undefined) };
+      expect(await rejection(host.checkpoint(0))).toBeInstanceOf(Error);
+      store.hooks = {};
       const boundary = envelope(
         "replica-b",
         1,
@@ -334,15 +335,17 @@ describe("R35–R40 control, reversible records, checkpoints, and composition po
           w.arrayDelete(ROOT_ID, ["items"], 0),
         ),
       );
-      host.submit(boundary, { actor: "b" });
-      host.checkpoint(0);
-      const restored = AuthorityHost.open(store, SCHEMA, () => {
+      await host.submit(boundary, { actor: "b" });
+      await host.checkpoint(0);
+      const restored = await AuthorityHost.open(store, SCHEMA, () => {
         throw new Error("no genesis");
       });
       expect(restored.authority.getTable().get(ROOT_ID)?.props).toEqual({ items: ["b"], count: 6 });
       expect(restored.authority.getRevision()).toBe(2);
       for (const retry of [delta, boundary]) {
-        const again = restored.submit(retry, { actor: retry.replica === "replica-a" ? "a" : "b" });
+        const again = await restored.submit(retry, {
+          actor: retry.replica === "replica-a" ? "a" : "b",
+        });
         expect(again.kind === "decided" && again.duplicate).toBe(true);
       }
       expect(restored.authority.getTable().get(ROOT_ID)?.props).toEqual({ items: ["b"], count: 6 });

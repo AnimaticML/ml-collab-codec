@@ -139,6 +139,7 @@ import type {
   UndoResult,
   UnsentCoalescingContext,
 } from "../../src/index.ts";
+import { rejection } from "../support/async.ts";
 
 const schema = registerSchema({
   id: "api.collab",
@@ -257,7 +258,7 @@ test("public API: records, builders, transforms, and composition", () => {
   expect(CHANGE_KINDS).toContain("setTag");
 });
 
-test("public API: identity, protocol, authority, host, and checkpoints", () => {
+test("public API: identity, protocol, authority, host, and checkpoints", async () => {
   const saved: AllocatorState[] = [];
   const store: AllocatorStore = { load: () => saved.at(-1), save: (s) => void saved.push(s) };
   const allocator = SequenceAllocator.open(store, () => "replica-api");
@@ -327,25 +328,28 @@ test("public API: identity, protocol, authority, host, and checkpoints", () => {
   let published: CheckpointBundle | undefined;
   let owner = 0;
   const durable: DurableStore = {
-    read: (): StoredHistory => ({ checkpoint: published, records, position: records.length }),
+    read: (): Promise<StoredHistory> =>
+      Promise.resolve({ checkpoint: published, records, position: records.length }),
     append: (expected, who, r) =>
-      who !== owner
-        ? "fenced"
-        : expected !== records.length
-          ? "stale"
-          : (records.push(r), "committed"),
-    acquire: () => ++owner,
-    stageCheckpoint: (b) => ((published = b), "cp"),
-    publishCheckpoint: () => undefined,
-    pruneThrough: () => undefined,
+      Promise.resolve(
+        who !== owner
+          ? "fenced"
+          : expected !== records.length
+            ? "stale"
+            : (records.push(r), "committed"),
+      ),
+    acquire: () => Promise.resolve(++owner),
+    stageCheckpoint: (b) => ((published = b), Promise.resolve({ staged: "cp" })),
+    publishCheckpoint: () => Promise.resolve("published"),
+    pruneThrough: () => Promise.resolve("pruned"),
   };
-  const host = AuthorityHost.open(durable, { id: schema.id, version: schema.version }, () =>
+  const host = await AuthorityHost.open(durable, { id: schema.id, version: schema.version }, () =>
     Authority.create("doc", "epoch", table, options),
   );
-  AuthorityHost.open(durable, { id: schema.id, version: schema.version }, () =>
+  await AuthorityHost.open(durable, { id: schema.id, version: schema.version }, () =>
     Authority.create("doc", "epoch", table, options),
   );
-  expect(() => host.submit(request, principal)).toThrow(StaleOwnerError);
+  expect(await rejection(host.submit(request, principal))).toBeInstanceOf(StaleOwnerError);
 });
 
 test("public API: client store, history, anchors, proposals, and runtime adapters", () => {

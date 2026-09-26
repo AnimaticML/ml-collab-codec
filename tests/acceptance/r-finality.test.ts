@@ -3,6 +3,7 @@ import { Authority } from "../../src/core/authority.ts";
 import type { Decision } from "../../src/core/authority.ts";
 import { exportCheckpoint, restoreAuthority } from "../../src/core/checkpoint.ts";
 import { SnapshotError } from "../../src/core/snapshot-rows.ts";
+import { rejection } from "../support/async.ts";
 import type { Change } from "../../src/core/change.ts";
 import type { Client } from "../../src/core/client.ts";
 import { schemaValidator } from "../../src/core/invariants.ts";
@@ -164,14 +165,14 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
     );
   });
 
-  test("R52 One logical authority has a host-independent atomic contract", () => {
+  test("R52 One logical authority has a host-independent atomic contract", async () => {
     const store = new FakeStore();
     const genesis = () => Authority.create(DOC, EPOCH, textDoc("ab"));
-    const host = AuthorityHost.open(store, SCHEMA, genesis);
+    const host = await AuthorityHost.open(store, SCHEMA, genesis);
     const base = textDoc("ab");
     // A racing handler with the same ownership commits first at revision 0.
-    const racer = AuthorityHost.open(store, SCHEMA, genesis);
-    racer.submit(
+    const racer = await AuthorityHost.open(store, SCHEMA, genesis);
+    await racer.submit(
       envelope(
         "replica-r",
         1,
@@ -181,19 +182,21 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
       { actor: "r" },
     );
     // The stale host is fenced; after reopening it reevaluates against the new context.
-    expect(() =>
-      host.submit(
-        envelope(
-          "replica-h",
-          1,
-          0,
-          build(base, "replica-h", 1, (w) => w.textInsert("t", 1, "H")),
+    expect(
+      await rejection(
+        host.submit(
+          envelope(
+            "replica-h",
+            1,
+            0,
+            build(base, "replica-h", 1, (w) => w.textInsert("t", 1, "H")),
+          ),
+          { actor: "h" },
         ),
-        { actor: "h" },
       ),
-    ).toThrow(StaleOwnerError);
-    const reopened = AuthorityHost.open(store, SCHEMA, genesis);
-    const decided = reopened.submit(
+    ).toBeInstanceOf(StaleOwnerError);
+    const reopened = await AuthorityHost.open(store, SCHEMA, genesis);
+    const decided = await reopened.submit(
       envelope(
         "replica-h",
         1,
@@ -206,8 +209,9 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
     expect(textOf(reopened.authority.getTable().get("t"))).toBe("aHRb");
     // Compare-and-commit loss: a second handler of the same owner commits at our position first;
     // the host reloads checkpoint + tail and re-evaluates instead of appending its stale candidate.
-    const peer = AuthorityHost.open(store, SCHEMA, genesis);
-    const sibling = restoreAuthority(store.read().checkpoint, store.read().records, SCHEMA);
+    const peer = await AuthorityHost.open(store, SCHEMA, genesis);
+    const stored = await store.read();
+    const sibling = restoreAuthority(stored.checkpoint, stored.records, SCHEMA);
     const siblingPrepared = sibling.prepare(
       envelope(
         "replica-s",
@@ -219,10 +223,10 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
     );
     const siblingRecord = recordOf(siblingPrepared);
     if (siblingRecord === undefined) throw new Error("setup");
-    expect(store.append(store.read().position, store.currentOwner(), siblingRecord)).toBe(
+    expect(await store.append(stored.position, store.currentOwner(), siblingRecord)).toBe(
       "committed",
     );
-    const q = peer.submit(
+    const q = await peer.submit(
       envelope(
         "replica-q",
         1,
@@ -232,13 +236,13 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
       { actor: "q" },
     );
     expect(q.kind === "decided" && q.transition?.revision).toBe(4);
-    expect(store.append(0, store.currentOwner() - 1, siblingRecord)).toBe("fenced");
+    expect(await store.append(0, store.currentOwner() - 1, siblingRecord)).toBe("fenced");
     // Checkpoint and restore on a fresh host with no process globals; retry an old request, then new work.
-    peer.checkpoint(1);
-    const fresh = AuthorityHost.open(store, SCHEMA, () => {
+    await peer.checkpoint(1);
+    const fresh = await AuthorityHost.open(store, SCHEMA, () => {
       throw new Error("genesis must not be needed");
     });
-    const retry = fresh.submit(
+    const retry = await fresh.submit(
       envelope(
         "replica-r",
         1,
@@ -248,7 +252,7 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
       { actor: "r" },
     );
     expect(retry.kind === "decided" && retry.duplicate).toBe(true);
-    fresh.submit(
+    await fresh.submit(
       envelope(
         "replica-n",
         1,
@@ -260,7 +264,7 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
     expect(textOf(fresh.authority.getTable().get("t"))).toBe("NQSaHRb");
     expect(fresh.authority.scope()).toEqual({ documentId: DOC, historyEpoch: EPOCH });
     // A separate document progresses independently.
-    const other = AuthorityHost.open(new FakeStore(), SCHEMA, () =>
+    const other = await AuthorityHost.open(new FakeStore(), SCHEMA, () =>
       Authority.create("doc-2", EPOCH, textDoc("zz")),
     );
     expect(other.authority.getRevision()).toBe(0);

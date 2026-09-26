@@ -25,7 +25,7 @@ import { DOC, EPOCH, Room } from "../support/room.ts";
 const SCHEMA = { id: "fixture.list", version: "1.0.0" };
 
 describe("R33 negative controls: history, publication, and runtime faults are detected", () => {
-  test("R33 Negative controls detect wrong-but-green history implementations", () => {
+  test("R33 Negative controls detect wrong-but-green history implementations", async () => {
     // Raw current→old-snapshot undo deletes remote text; the real collaborative undo keeps it.
     const undoResult = (snapshotUndo: boolean): string => {
       const room = new Room(textDoc("ab"));
@@ -114,17 +114,17 @@ describe("R33 negative controls: history, publication, and runtime faults are de
 
     // A stale concurrent writer that appends without compare-and-commit forks the history.
     class CarelessStore extends FakeStore {
-      override append(
+      override async append(
         _expected: number,
         owner: number,
         record: DecisionRecord,
-      ): "committed" | "stale" | "fenced" {
-        return super.append(this.read().position, owner, record);
+      ): Promise<"committed" | "stale" | "fenced"> {
+        return super.append((await this.read()).position, owner, record);
       }
     }
-    const forks = (store: FakeStore): number[] => {
+    const forks = async (store: FakeStore): Promise<number[]> => {
       const genesis = () => Authority.create(DOC, EPOCH, textDoc("ab"));
-      const one = AuthorityHost.open(store, SCHEMA, genesis);
+      const one = await AuthorityHost.open(store, SCHEMA, genesis);
       const owner = store.currentOwner();
       const stale = one.authority.prepare(
         envelope(
@@ -135,7 +135,7 @@ describe("R33 negative controls: history, publication, and runtime faults are de
         ),
         { actor: "s" },
       );
-      one.submit(
+      await one.submit(
         envelope(
           "replica-o",
           1,
@@ -155,14 +155,14 @@ describe("R33 negative controls: history, publication, and runtime faults are de
                 : { transition: stale.decision.transition }),
             }
           : undefined;
-      if (staleRecord !== undefined) store.append(0, owner, staleRecord);
-      const history: StoredHistory = store.read();
+      if (staleRecord !== undefined) await store.append(0, owner, staleRecord);
+      const history: StoredHistory = await store.read();
       return history.records.flatMap((r) =>
         r.transition === undefined ? [] : [r.transition.revision],
       );
     };
-    expect(forks(new FakeStore())).toEqual([1]);
-    expect(forks(new CarelessStore())).toEqual([1, 1]);
+    expect(await forks(new FakeStore())).toEqual([1]);
+    expect(await forks(new CarelessStore())).toEqual([1, 1]);
   });
 
   test("R33 Negative controls detect wrong-but-green publication and runtime", () => {

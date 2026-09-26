@@ -194,6 +194,8 @@ named test; the file column names where the substantive assertions live.
 | MR31 | History delivery and permissions                  | `mr-history.test.ts`    |
 | MR32 | Corrupt checkpoint rejection                      | `mr-checkpoint.test.ts` |
 | MR33 | Retention races and retry boundaries              | `mr-checkpoint.test.ts` |
+| MR39 | Delayed durable append                            | `mr-host.test.ts`       |
+| MR40 | Async checkpoint cut and ownership                | `mr-host.test.ts`       |
 
 ## Required expansion beyond the baseline
 
