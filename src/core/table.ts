@@ -1,4 +1,5 @@
 import type { ComponentNode, ContentItem, DocumentModel, JsonObject } from "./types.ts";
+import { diag, DiagnosticError } from "./diagnostics.ts";
 
 /**
  * The flat node-table working representation used by the operation engine.
@@ -78,9 +79,37 @@ export function makeRow(
 }
 
 /** Convert a document into an operational table. The root row always has id "$root". */
+function collectPersistedIds(node: ComponentNode, into: Set<string>): Set<string> {
+  for (const item of node.content ?? []) {
+    if (typeof item === "string") continue;
+    if (item.id !== undefined) {
+      if (into.has(item.id) || item.id === ROOT_ID)
+        throw new DiagnosticError([diag("duplicateId", "$", `duplicate id "${item.id}"`)]);
+      into.add(item.id);
+    }
+    collectPersistedIds(item, into);
+  }
+  return into;
+}
+
+/**
+ * Build the operational table. Internal handles for anonymous nodes and text runs
+ * never reuse an id the document already carries (a document may legitimately use
+ * ids like "t1"); a duplicate persisted id is an error, never a silently merged row.
+ */
 export function toTable(model: DocumentModel, allocate: () => string): Table {
+  const used = collectPersistedIds(model.root, new Set([ROOT_ID]));
+  const fresh = (): string => {
+    for (;;) {
+      const id = allocate();
+      if (!used.has(id)) {
+        used.add(id);
+        return id;
+      }
+    }
+  };
   const table = new Map<string, TableNode>();
-  const childIds = (model.root.content ?? []).map((item) => ingest(table, item, ROOT_ID, allocate));
+  const childIds = (model.root.content ?? []).map((item) => ingest(table, item, ROOT_ID, fresh));
   table.set(ROOT_ID, makeRow(ROOT_ID, model.root.tag, model.root.props, null, childIds, false));
   return table;
 }

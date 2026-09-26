@@ -36,6 +36,26 @@ test("I01 Addressable roles, not all objects", () => {
   expect(reparsed.ok && findNodeById(reparsed.value.root, "p1")?.node.id).toBe("p1");
 });
 
+test("I01 Persisted ids that look like internal handles do not collide", () => {
+  // Regression (found while benchmarking): a table with id "t1" collided with the internal
+  // handle "t1" of an anonymous text run, producing a cyclic table.
+  const model = parsed(`<doc><p id="t1">a <emphasis>b</emphasis></p><p id="t0">c</p></doc>`);
+  const table = toTable(model, createAllocator());
+  expect(table.get("t1")?.tag).toBe("p");
+  expect(fromTable(table, richTextSchema.id, richTextSchema.version)).toEqual(model);
+  const duplicate = {
+    ...model,
+    root: {
+      ...model.root,
+      content: [
+        { tag: "p", id: "x", props: {} },
+        { tag: "p", id: "x", props: {} },
+      ],
+    },
+  };
+  expect(() => toTable(duplicate, createAllocator())).toThrow("duplicate id");
+});
+
 test("I02 Move, copy, split, and merge identity", () => {
   const table = toTable(
     parsed(`<doc><p id="p1">alpha</p><p id="p2">beta</p></doc>`),
