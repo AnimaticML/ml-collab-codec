@@ -44,6 +44,12 @@ export class Room {
     return client;
   }
 
+  /** Register a client created elsewhere (for example by `joinClient`) as a room member. */
+  adopt(name: string, actor: string, client: Client): Client {
+    this.members.set(name, { name, actor, client, inbox: [] });
+    return client;
+  }
+
   member(name: string): Member {
     const member = this.members.get(name);
     if (member === undefined) throw new Error(`no member ${name}`);

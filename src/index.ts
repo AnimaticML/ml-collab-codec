@@ -128,13 +128,23 @@ export {
   exportCheckpoint,
   importCheckpoint,
   restoreAuthority,
-  CheckpointError,
   CHECKPOINT_FORMAT,
 } from "./core/checkpoint.ts";
+export { SnapshotError } from "./core/snapshot-rows.ts";
+export type { Bootstrap, JoinOptions, SessionStore } from "./core/join.ts";
+export {
+  BOOTSTRAP_FORMAT,
+  beginJoin,
+  bootstrapFromCheckpoint,
+  captureBootstrap,
+  joinClient,
+  readBootstrap,
+} from "./core/join.ts";
 export type { DurableStore, StoredHistory } from "./core/host.ts";
 export { AuthorityHost, StaleOwnerError } from "./core/host.ts";
 
 export type { ClientOptions, ClientSession, ClientStatus, TransactResult } from "./core/client.ts";
+export type { HistoryStatus, SchemaRef } from "./core/client-types.ts";
 export { Client } from "./core/client.ts";
 export type { PendingEntry, RetainedIntent, RetainedStatus } from "./core/client-queue.ts";
 export type { UndoResult } from "./core/client-undo.ts";

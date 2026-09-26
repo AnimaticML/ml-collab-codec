@@ -20,7 +20,14 @@ import type {
 import { Publisher } from "./store.ts";
 import { runRedo, runUndo } from "./client-undo.ts";
 import { Inbox } from "./client-inbox.ts";
-import type { ClientOptions, ClientSession, ClientStatus, TransactResult } from "./client-types.ts";
+import { checkSession, exportSession } from "./client-session.ts";
+import type {
+  ClientOptions,
+  ClientSession,
+  ClientStatus,
+  HistoryStatus,
+  TransactResult,
+} from "./client-types.ts";
 export type { ClientOptions, ClientSession, ClientStatus, TransactResult } from "./client-types.ts";
 import type { UndoResult } from "./client-undo.ts";
 
@@ -39,19 +46,16 @@ export class Client implements DocumentStore {
   private readonly authoring: AuthoringState;
   private deferredUndo: string | undefined;
   private readonly now: () => number;
+  private historyStatus: HistoryStatus;
 
   constructor(readonly options: ClientOptions) {
     const restored = options.restore;
-    if (
-      restored !== undefined &&
-      (restored.documentId !== options.documentId ||
-        restored.historyEpoch !== options.historyEpoch ||
-        restored.revision !== options.revision)
-    )
-      throw new ProtocolError(
-        "wrongDocument",
-        "session belongs to a different document, epoch, or revision",
-      );
+    if (restored !== undefined) checkSession(restored, options);
+    this.historyStatus =
+      options.historyStatus ??
+      (restored === undefined
+        ? { status: "empty" }
+        : { status: "restored", revision: restored.revision });
     const view = materialize(options.table, restored?.pending ?? [], restored?.retained ?? []);
     this.state = {
       confirmed: options.table,
@@ -123,6 +127,7 @@ export class Client implements DocumentStore {
       doomed: pending.filter((entry) => entry.state === "doomed").map((entry) => entry.id),
       retained: this.state.retained,
       integrations: { ...this.integrations },
+      history: this.historyStatus,
     };
   }
 
@@ -274,6 +279,7 @@ export class Client implements DocumentStore {
         reason,
       }));
       this.history.forgetAll(revision);
+      this.historyStatus = { status: "unavailable", reason };
       this.inbox.clear();
       const state = {
         confirmed: table,
@@ -317,17 +323,6 @@ export class Client implements DocumentStore {
   }
 
   exportSession(): ClientSession {
-    const { documentId, historyEpoch } = this.options;
-    return JSON.parse(
-      JSON.stringify({
-        format: "sdl.client-session/1",
-        documentId,
-        historyEpoch,
-        revision: this.state.revision,
-        pending: this.state.pending,
-        retained: this.state.retained,
-        history: this.history.export(),
-      }),
-    ) as ClientSession;
+    return exportSession(this.options, this.state, this.history.export());
   }
 }

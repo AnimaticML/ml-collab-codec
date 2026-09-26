@@ -201,8 +201,12 @@ function decodeStructuralChange(kind: string, f: Fields): Change | undefined {
         gap: f.int("gap"),
         origin,
       };
-    case "setTag":
-      return { kind, node: f.str("node"), before: f.str("before"), after: f.str("after"), origin };
+    case "setTag": {
+      const [before, after] = [f.str("before"), f.str("after")];
+      // An identity retag has no effect; accepting it would create an empty revision.
+      if (before === after) throw new DecodeError(`${path}.after`, "a retag must change the tag");
+      return { kind, node: f.str("node"), before, after, origin };
+    }
     case "split":
     case "merge":
       return {

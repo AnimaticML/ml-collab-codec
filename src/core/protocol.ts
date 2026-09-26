@@ -109,7 +109,7 @@ function sequences(value: unknown, path: string): number[] {
   return value;
 }
 
-function decodeMeta(value: unknown): RequestMeta {
+export function decodeMeta(value: unknown): RequestMeta {
   if (value === undefined) return {};
   if (typeof value !== "object" || value === null || Array.isArray(value))
     throw new DecodeError("meta", "expected an object");

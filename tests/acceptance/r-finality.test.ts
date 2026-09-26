@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { Authority } from "../../src/core/authority.ts";
 import type { Decision } from "../../src/core/authority.ts";
-import { exportCheckpoint, restoreAuthority, CheckpointError } from "../../src/core/checkpoint.ts";
+import { exportCheckpoint, restoreAuthority } from "../../src/core/checkpoint.ts";
+import { SnapshotError } from "../../src/core/snapshot-rows.ts";
 import type { Change } from "../../src/core/change.ts";
 import type { Client } from "../../src/core/client.ts";
 import { schemaValidator } from "../../src/core/invariants.ts";
@@ -297,11 +298,11 @@ describe("R50–R54 revisions, deduplication, hosting, profile, and presence", (
     expect(client.getStatus().inFlight).toEqual({ replica: "replica-a", seq: 1 });
     const checkpoint = exportCheckpoint(room.authority, SCHEMA);
     expect(() => restoreAuthority({ ...checkpoint, profile: "sdl.vector/1" }, [], SCHEMA)).toThrow(
-      CheckpointError,
+      SnapshotError,
     );
     expect(() =>
       restoreAuthority(checkpoint, [], { id: "fixture.list", version: "2.0.0" }),
-    ).toThrow(CheckpointError);
+    ).toThrow(SnapshotError);
     room.settle();
     expect(textOf(room.authority.getTable().get("t"))).toBe("axb");
   });

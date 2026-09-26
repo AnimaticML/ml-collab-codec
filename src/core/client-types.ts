@@ -4,6 +4,23 @@ import type { PendingEntry, RetainedIntent } from "./client-queue.ts";
 import type { RequestId, SequenceAllocator } from "./identity.ts";
 import type { Table } from "./table.ts";
 
+/** The schema interpretation a snapshot or session was produced under. */
+export interface SchemaRef {
+  readonly id: string;
+  readonly version: string;
+}
+
+/**
+ * Whether this client holds own undo history, and why not: `empty` for a
+ * fresh participant (a snapshot carries no history), `restored` for a
+ * session attached in its own context, `unavailable` when the session's
+ * context was gone (pending work became retained intent).
+ */
+export type HistoryStatus =
+  | { readonly status: "empty" }
+  | { readonly status: "restored"; readonly revision: number }
+  | { readonly status: "unavailable"; readonly reason: string };
+
 export interface ClientOptions {
   readonly documentId: string;
   readonly historyEpoch: string;
@@ -18,11 +35,18 @@ export interface ClientOptions {
   readonly coalescing?: CoalescingPolicy;
   readonly undoLimit?: number;
   readonly restore?: ClientSession;
+  /** The schema interpretation, recorded in exported sessions and checked on restore. */
+  readonly schemaRef?: SchemaRef;
+  /** Set by `joinClient` when a supplied session could not be attached in its context. */
+  readonly historyStatus?: HistoryStatus;
 }
 
 /** Locally persisted session: pending requests (with original sent bytes), retained intent, and history handles. */
 export interface ClientSession {
-  readonly format: "sdl.client-session/1";
+  readonly format: "sdl.client-session/2";
+  /** The authenticated actor that owns this history; only that actor may restore it. */
+  readonly actor: string;
+  readonly schema?: SchemaRef;
   readonly documentId: string;
   readonly historyEpoch: string;
   readonly revision: number;
@@ -48,4 +72,5 @@ export interface ClientStatus {
   readonly retained: readonly RetainedIntent[];
   /** Incoming transitions integrated on the forward paired path versus private recovery. */
   readonly integrations: { readonly forward: number; readonly recovery: number };
+  readonly history: HistoryStatus;
 }

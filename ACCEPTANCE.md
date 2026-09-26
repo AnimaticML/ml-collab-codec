@@ -180,11 +180,20 @@ literal named tests; the file column names where the primary assertions live.
 Normative text: `ML_COLLAB_REMEDIATION_ACCEPTANCE.md`. Each family has at least one literal
 named test; the file column names where the substantive assertions live.
 
-| ID   | Family                                | Primary tests     |
-| ---- | ------------------------------------- | ----------------- |
-| MR11 | Same-ID node type change              | `mr-diff.test.ts` |
-| MR12 | Structural and list diff laws         | `mr-diff.test.ts` |
-| MR13 | Granularity and stale agent proposals | `mr-diff.test.ts` |
+| ID   | Family                                            | Primary tests           |
+| ---- | ------------------------------------------------- | ----------------------- |
+| MR11 | Same-ID node type change                          | `mr-diff.test.ts`       |
+| MR12 | Structural and list diff laws                     | `mr-diff.test.ts`       |
+| MR13 | Granularity and stale agent proposals             | `mr-diff.test.ts`       |
+| MR25 | Snapshot is state, not genesis replay             | `mr-join.test.ts`       |
+| MR26 | Fresh join at a current snapshot                  | `mr-join.test.ts`       |
+| MR27 | Stored snapshot plus nonempty tail and live race  | `mr-join.test.ts`       |
+| MR28 | Join keeps addresses and permits contextual edits | `mr-join.test.ts`       |
+| MR29 | Pre-snapshot own undo/redo with retained handles  | `mr-history.test.ts`    |
+| MR30 | Stale session versus newer snapshot               | `mr-history.test.ts`    |
+| MR31 | History delivery and permissions                  | `mr-history.test.ts`    |
+| MR32 | Corrupt checkpoint rejection                      | `mr-checkpoint.test.ts` |
+| MR33 | Retention races and retry boundaries              | `mr-checkpoint.test.ts` |
 
 ## Required expansion beyond the baseline
 

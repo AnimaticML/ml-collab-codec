@@ -11,7 +11,7 @@ import {
   CHECKPOINT_FORMAT,
   CHANGE_KINDS,
   ChangeBuilder,
-  CheckpointError,
+  SnapshotError,
   children,
   ClassProjection,
   Client,
@@ -319,7 +319,7 @@ test("public API: identity, protocol, authority, host, and checkpoints", () => {
   );
   expect(() =>
     importCheckpoint({ ...bundle, format: "x" }, { id: schema.id, version: schema.version }),
-  ).toThrow(CheckpointError);
+  ).toThrow(SnapshotError);
   expect(
     restoreAuthority(bundle, [], { id: schema.id, version: schema.version }).getRevision(),
   ).toBe(1);
