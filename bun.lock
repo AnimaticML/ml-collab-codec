@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "collab-doc-codec",
+      "name": "ml-collab-codec",
       "devDependencies": {
         "@eslint/js": "^9.39.1",
         "@types/bun": "^1.3.0",

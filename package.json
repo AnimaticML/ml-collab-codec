@@ -1,5 +1,5 @@
 {
-  "name": "collab-doc-codec",
+  "name": "ml-collab-codec",
   "version": "0.0.0",
   "private": true,
   "description": "Schema-defined documents, readable source, agent editing, and structural/text OT with collaborative undo.",
@@ -52,6 +52,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AnimaticML/CollabDocCodec.git"
+    "url": "git+https://github.com/AnimaticML/ml-collab-codec.git"
   }
 }

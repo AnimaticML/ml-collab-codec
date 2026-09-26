@@ -1,4 +1,4 @@
-# CollabDocCodec
+# ml-collab-codec
 
 A TypeScript library for schema-defined structured documents: readable tagged source
 and equivalent JSON, validation and diff, agent editing, and structural/text
@@ -6,7 +6,7 @@ operational transformation with collaborative undo/redo. Bun is the development 
 test runner; the core has no DOM, Node, or Bun runtime dependency.
 
 Licensed under the Apache License 2.0 (`LICENSE`). The source is public at
-<https://github.com/AnimaticML/CollabDocCodec>; the npm package stays
+<https://github.com/AnimaticML/ml-collab-codec>; the npm package stays
 `"private": true` (not published) until a release is decided.
 
 Documents: `SPEC.md` (behavioral contract; §18 records the OT revision v3 decisions),
@@ -44,7 +44,7 @@ import {
   createAllocator,
   ChangeBuilder,
   applyChanges,
-} from "collab-doc-codec";
+} from "ml-collab-codec";
 
 const parsed = parseDocument(source, schema); // diagnostics on invalid input, never silent defaults
 if (!parsed.ok) throw new Error(parsed.diagnostics.map((d) => d.message).join("; "));
@@ -66,7 +66,7 @@ needs no snapshot or history.
 ### Collaboration: one authority per document, optimistic clients
 
 ```ts
-import { Authority, Client, SequenceAllocator, schemaInvariants } from "collab-doc-codec";
+import { Authority, Client, SequenceAllocator, schemaInvariants } from "ml-collab-codec";
 
 const authority = Authority.create("doc-1", "epoch-1", table, {
   validators: [schemaInvariants(schema)],

@@ -17,7 +17,7 @@ import {
   type ServerEvent,
   type Table,
   type UndoResult,
-} from "collab-doc-codec";
+} from "ml-collab-codec";
 
 const table: Table = toTable(
   { schemaId: "typed", schemaVersion: "1", root: { tag: "doc", props: {}, content: ["text"] } },

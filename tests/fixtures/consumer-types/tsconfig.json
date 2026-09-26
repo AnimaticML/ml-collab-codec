@@ -9,7 +9,7 @@
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "types": [],
-    "paths": { "collab-doc-codec": ["../../../dist/types/index.d.ts"] }
+    "paths": { "ml-collab-codec": ["../../../dist/types/index.d.ts"] }
   },
   "files": ["consumer.ts"]
 }

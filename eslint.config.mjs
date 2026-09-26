@@ -2,7 +2,18 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["node_modules/**", "dist/**", "coverage/**", ".artifacts/**", ".reference/**"] },
+  {
+    ignores: [
+      "node_modules/**",
+      "dist/**",
+      "coverage/**",
+      ".artifacts/**",
+      ".reference/**",
+      // Consumer of the *built* declarations: it only resolves after `bun run build`, and it is
+      // type-checked by tsc against dist/types inside acceptance test Q02.
+      "tests/fixtures/consumer-types/**",
+    ],
+  },
   {
     files: ["**/*.mjs"],
     ...js.configs.recommended,
