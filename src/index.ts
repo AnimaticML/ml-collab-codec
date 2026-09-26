@@ -89,7 +89,9 @@ export {
   mergeContainers,
   findOccurrence,
 } from "./core/builder-rich.ts";
-export { diffToChanges, minimalSplice } from "./core/diff.ts";
+export { diffToChanges } from "./core/diff.ts";
+export { textHunks } from "./core/diff-text.ts";
+export type { TextHunk } from "./core/diff-text.ts";
 
 export type { RequestId, AllocatorState, AllocatorStore } from "./core/identity.ts";
 export {

@@ -175,6 +175,17 @@ literal named tests; the file column names where the primary assertions live.
 | R53 | The scalar profile is explicit and fail-closed         | `r-finality.test.ts`                                        |
 | R54 | Ephemeral presence does not mutate document history    | `r-finality.test.ts`                                        |
 
+## Remediation families (MR01–MR44)
+
+Normative text: `ML_COLLAB_REMEDIATION_ACCEPTANCE.md`. Each family has at least one literal
+named test; the file column names where the substantive assertions live.
+
+| ID   | Family                                | Primary tests     |
+| ---- | ------------------------------------- | ----------------- |
+| MR11 | Same-ID node type change              | `mr-diff.test.ts` |
+| MR12 | Structural and list diff laws         | `mr-diff.test.ts` |
+| MR13 | Granularity and stale agent proposals | `mr-diff.test.ts` |
+
 ## Required expansion beyond the baseline
 
 These scenarios name families, not one happy-path assertion each. Expand them into

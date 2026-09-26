@@ -41,7 +41,6 @@ import {
   mapAnchorFrom,
   MAX_SEQUENCE,
   mergeContainers,
-  minimalSplice,
   noCoalescing,
   OPERATION_FORMAT,
   proposeEdit,
@@ -58,6 +57,7 @@ import {
   StaleDecisionError,
   StaleOwnerError,
   TEXT_TAG,
+  textHunks,
   textOf,
   toTable,
   TransformLimitError,
@@ -128,6 +128,7 @@ import type {
   SubtreeRecord,
   Table,
   TableNode,
+  TextHunk,
   TextSegment,
   TransactResult,
   TransformConflict,
@@ -231,7 +232,11 @@ test("public API: records, builders, transforms, and composition", () => {
   const code: TransformConflictCode = conflict.conflict;
   expect(isConflict(conflict) && code).toBe("concurrentWrite");
   expect(compose(ins, [])).toEqual([...ins]);
-  expect(minimalSplice("abc", "aXc")).toEqual({ from: 1, to: 2, insert: "X" });
+  const hunks: readonly TextHunk[] = textHunks("abc def ghi", "aXc def ghY");
+  expect(hunks).toEqual([
+    { from: 1, to: 2, insert: "X" },
+    { from: 10, to: 11, insert: "Y" },
+  ]);
   expect(
     diffToChanges(table, fromTable(after, schema.id, schema.version).root, author).length,
   ).toBeGreaterThan(0);

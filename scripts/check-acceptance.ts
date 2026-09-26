@@ -20,7 +20,7 @@ async function collectTests(directory: string): Promise<TestSource[]> {
 
 async function main(): Promise<void> {
   const spec = await readFile(resolve(root, "ACCEPTANCE.md"), "utf8");
-  const ids = [...spec.matchAll(/^\|\s*([CSIOPVQR]\d{2})\s*\|/gm)].flatMap((match) =>
+  const ids = [...spec.matchAll(/^\|\s*((?:MR|[CSIOPVQR])\d{2})\s*\|/gm)].flatMap((match) =>
     match[1] === undefined ? [] : [match[1]],
   );
   const sources = await collectTests(resolve(root, "tests/acceptance"));

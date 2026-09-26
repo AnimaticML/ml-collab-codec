@@ -68,3 +68,13 @@ test("completion guard counts revision scenario IDs like baseline IDs", () => {
     "R53: no active literal baseline test.",
   );
 });
+
+test("completion guard counts remediation MR IDs like baseline IDs", () => {
+  const sources = [
+    { path: "mr.test.ts", source: 'test("MR11 same-id type change", () => { check(); });' },
+  ];
+  expect(inspectAcceptance(["MR11"], sources, true)).toEqual([]);
+  expect(inspectAcceptance(["MR11", "MR12"], sources, true)).toContain(
+    "MR12: no active literal baseline test.",
+  );
+});

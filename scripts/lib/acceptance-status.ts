@@ -18,7 +18,7 @@ export function inspectAcceptance(
   for (const { path, source } of sources) {
     // Keep baseline cases as literal test("C01 ...", callback) declarations.
     const declarations =
-      /\b(?:test|it)(?:\.(todo|skip|only))?\s*\(\s*(["'`])([CSIOPVQR]\d{2})\b(?:\\.|(?!\2)[\s\S])*?\2\s*([,)])/g;
+      /\b(?:test|it)(?:\.(todo|skip|only))?\s*\(\s*(["'`])((?:MR|[CSIOPVQR])\d{2})\b(?:\\.|(?!\2)[\s\S])*?\2\s*([,)])/g;
     for (const match of source.matchAll(declarations)) {
       const [, modifier, , id, delimiter] = match;
       if (id === undefined) continue;
