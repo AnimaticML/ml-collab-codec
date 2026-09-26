@@ -3,7 +3,7 @@ import type { ClientSession } from "../../src/core/client.ts";
 import { captureBootstrap, joinClient } from "../../src/core/join.ts";
 import type { SessionStore } from "../../src/core/join.ts";
 import { ProtocolError } from "../../src/core/protocol.ts";
-import { ROOT_ID } from "../../src/core/table.ts";
+import { fromTable, ROOT_ID } from "../../src/core/table.ts";
 import {
   allocator,
   content,
@@ -12,7 +12,9 @@ import {
   joinRef,
   joinSchema,
 } from "../support/join-fixture.ts";
-import { envelope } from "../support/requests.ts";
+import { build, envelope } from "../support/requests.ts";
+import { setupGame } from "../support/game.ts";
+import { hiddenHandSchema } from "../fixtures/hidden-hand-schema.ts";
 import { Room } from "../support/room.ts";
 
 /** An in-memory, asynchronous actor-scoped session store (the host port a real app would back). */
@@ -264,5 +266,51 @@ describe("MR29–MR31 history restoration and permissions", () => {
         actor: "alice",
       }),
     ).toThrow("different schema");
+    // Restricted participants bootstrap from their projection, never a full checkpoint.
+    const game = setupGame();
+    const gameRef = { id: hiddenHandSchema.id, version: hiddenHandSchema.version };
+    const view = { principal: "bob", table: game.view("bob") };
+    const bobBoot = captureBootstrap(game.authority, gameRef, view);
+    expect(JSON.stringify(bobBoot)).not.toContain("cardA1");
+    const bobClient = joinClient({
+      bootstrap: bobBoot,
+      schema: hiddenHandSchema,
+      allocator: allocator("replica-bob"),
+      actor: "bob",
+    });
+    // A reveal (alice plays her hidden card) reaches bob as a projected insertion...
+    const play = game.submitAction(
+      "alice",
+      "playCard",
+      { cardId: "cardA1" },
+      { replica: "replica-al", seq: 1 },
+    );
+    const revealed = play.eventsFor("bob");
+    const transition = revealed.find((e) => e.type === "transition");
+    expect(transition?.type === "transition" && transition.changes.map((c) => c.kind)).toEqual([
+      "nodeInsert",
+    ]);
+    bobClient.receive(revealed);
+    // ...while a later edit to public content is forwarded verbatim (same records and handles).
+    const publicEdit = game.submit(
+      envelope(
+        "replica-bob",
+        1,
+        game.authority.getRevision(),
+        build(game.authority.getTable(), "replica-bob", 1, (b) => b.set("cardA1", "suit", "clubs")),
+      ),
+      { actor: "bob" },
+    );
+    const forwarded = publicEdit.eventsFor("bob").find((e) => e.type === "transition");
+    const accepted =
+      publicEdit.decision.kind === "decided" ? publicEdit.decision.transition : undefined;
+    expect(accepted?.changes).toHaveLength(1);
+    expect(forwarded?.type === "transition" ? forwarded.changes : []).toEqual(
+      accepted?.changes ?? [],
+    );
+    bobClient.receive(publicEdit.eventsFor("bob"));
+    expect(fromTable(bobClient.getSnapshot().table, "g", "1")).toEqual(
+      fromTable(game.view("bob"), "g", "1"),
+    );
   });
 });

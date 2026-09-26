@@ -85,6 +85,30 @@ function listParents(change: Change): string[] {
   return [];
 }
 
+/** Every node the changes address is absent or visible, and every addressed child list is fully visible. */
+function addressable(
+  table: Table,
+  profile: SchemaProfile,
+  changes: readonly Change[],
+  principal: string,
+): boolean {
+  const visible = (id: string): boolean => canSee(table, profile, id, principal);
+  return changes.every(
+    (change) =>
+      touchedByChange(change).every((id) => !table.has(id) || visible(id)) &&
+      listParents(change).every((parent) => (table.get(parent)?.children ?? []).every(visible)),
+  );
+}
+
+/** Whether a change could move content between regions (an owner property or a component type). */
+function regionShaping(table: Table, profile: SchemaProfile, change: Change): boolean {
+  if (change.kind === "setTag") return true;
+  if (!("path" in change)) return false;
+  const row = table.get(change.node);
+  const ownerProp = row === undefined ? undefined : profile.components[row.tag]?.regionOwnerProp;
+  return ownerProp !== undefined && (change.path.length === 0 || change.path[0] === ownerProp);
+}
+
 export interface RestrictedDecision {
   readonly decision: Decision;
   /** Events this principal may receive: projected content, safe receipt; never another region's data. */
@@ -115,22 +139,7 @@ export class RestrictedAuthority {
   }
 
   private scopedAllowed(actor: string, changes: readonly Change[], current: Table): boolean {
-    for (const change of changes) {
-      if (
-        !touchedByChange(change).every(
-          (id) => !current.has(id) || canSee(current, this.profile, id, actor),
-        )
-      )
-        return false;
-      for (const parent of listParents(change))
-        if (
-          !(current.get(parent)?.children ?? []).every((child) =>
-            canSee(current, this.profile, child, actor),
-          )
-        )
-          return false;
-    }
-    return true;
+    return addressable(current, this.profile, changes, actor);
   }
 
   view(principal: string): Table {
@@ -216,9 +225,9 @@ export class RestrictedAuthority {
         const events: ServerEvent[] = [];
         const transition = decision.transition;
         if (transition !== undefined) {
-          const seen = projectTable(before, profile, principal);
-          const target = fromTable(projectTable(after, profile, principal), "projection", "1").root;
-          const changes = diffToChanges(seen, target, transition.request);
+          const changes = forwardable(transition.changes, before, after, profile, principal)
+            ? transition.changes
+            : projectedChanges(before, after, profile, principal, transition.request);
           events.push({
             ...transition,
             meta: transition.actor === principal ? transition.meta : {},
@@ -230,4 +239,40 @@ export class RestrictedAuthority {
       },
     };
   }
+}
+
+/**
+ * The original records can be delivered unchanged (same handles, no
+ * projection work) when they address only content the principal sees both
+ * before and after and cannot move content between regions.
+ */
+function forwardable(
+  changes: readonly Change[],
+  before: Table,
+  after: Table,
+  profile: SchemaProfile,
+  principal: string,
+): boolean {
+  return (
+    !changes.some((change) => regionShaping(before, profile, change)) &&
+    addressable(before, profile, changes, principal) &&
+    addressable(after, profile, changes, principal)
+  );
+}
+
+/**
+ * Fallback when visibility changes (reveals, hides, region moves): diff the
+ * principal's projections. This costs a projection of both states, and
+ * newly revealed anonymous content gets participant-local handles.
+ */
+function projectedChanges(
+  before: Table,
+  after: Table,
+  profile: SchemaProfile,
+  principal: string,
+  author: RequestId,
+): Change[] {
+  const seen = projectTable(before, profile, principal);
+  const target = fromTable(projectTable(after, profile, principal), "projection", "1").root;
+  return diffToChanges(seen, target, author);
 }

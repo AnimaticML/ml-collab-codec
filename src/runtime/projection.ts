@@ -29,6 +29,9 @@ export interface ProjectionOptions<I extends ProjectedInstance> {
  */
 export class ClassProjection<I extends ProjectedInstance> {
   private readonly instances = new Map<string, I>();
+  /** Referenced id → ids of instances whose last `resolve` looked it up. */
+  private readonly referrers = new Map<string, Set<string>>();
+  private readonly lookedUp = new Map<string, Set<string>>();
   private snapshot: DocumentSnapshot;
   private updating = false;
   private readonly unsubscribe: () => void;
@@ -79,9 +82,25 @@ export class ClassProjection<I extends ProjectedInstance> {
     } else existing.install(row);
   }
 
-  private resolveAll(): void {
-    const lookup = (id: string): ProjectedInstance | undefined => this.instances.get(id);
-    for (const instance of this.instances.values()) instance.resolve?.(lookup);
+  /**
+   * Re-resolve references for the given instances. Lookups are recorded, so
+   * a later commit re-resolves only instances that were changed or that
+   * looked up a changed id — not every instance.
+   */
+  private resolve(ids: Iterable<string>): void {
+    for (const id of ids) {
+      for (const target of this.lookedUp.get(id) ?? []) this.referrers.get(target)?.delete(id);
+      this.lookedUp.delete(id);
+      const instance = this.instances.get(id);
+      if (instance?.resolve === undefined) continue;
+      const seen = new Set<string>();
+      instance.resolve((target) => {
+        seen.add(target);
+        this.referrers.set(target, (this.referrers.get(target) ?? new Set()).add(id));
+        return this.instances.get(target);
+      });
+      this.lookedUp.set(id, seen);
+    }
   }
 
   /** Full resynchronization from one complete snapshot (also the failure-recovery path). */
@@ -91,7 +110,7 @@ export class ClassProjection<I extends ProjectedInstance> {
       for (const id of [...this.instances.keys()])
         if (!snapshot.table.has(id)) this.upsert(undefined, id);
       for (const [id, row] of snapshot.table) this.upsert(row, id);
-      this.resolveAll();
+      this.resolve([...this.instances.keys()]);
       this.snapshot = snapshot;
     } finally {
       this.updating = false;
@@ -107,14 +126,22 @@ export class ClassProjection<I extends ProjectedInstance> {
       ...summary.text,
       ...summary.props.map((p) => p.node),
       ...summary.moved.map((m) => m.node),
+      ...summary.retagged.map((r) => r.node),
     ]);
     this.updating = true;
     try {
+      const changed = new Set<string>();
       for (const id of affected) {
         const row = commit.next.table.get(id);
-        if (row !== commit.previous.table.get(id) || row === undefined) this.upsert(row, id);
+        if (row !== commit.previous.table.get(id) || row === undefined) {
+          this.upsert(row, id);
+          changed.add(id);
+        }
       }
-      this.resolveAll();
+      const stale = new Set(changed);
+      for (const id of changed)
+        for (const referrer of this.referrers.get(id) ?? []) stale.add(referrer);
+      this.resolve(stale);
       this.snapshot = commit.next;
     } catch (error) {
       this.options.onError?.(error);

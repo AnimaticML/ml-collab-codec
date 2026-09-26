@@ -185,6 +185,9 @@ named test; the file column names where the substantive assertions live.
 | MR11 | Same-ID node type change                          | `mr-diff.test.ts`       |
 | MR12 | Structural and list diff laws                     | `mr-diff.test.ts`       |
 | MR13 | Granularity and stale agent proposals             | `mr-diff.test.ts`       |
+| MR22 | Async completion reaches dependents               | `mr-runtime.test.ts`    |
+| MR23 | Replaced/stale async computations                 | `mr-runtime.test.ts`    |
+| MR24 | Coherent publication and scheduled work           | `mr-runtime.test.ts`    |
 | MR25 | Snapshot is state, not genesis replay             | `mr-join.test.ts`       |
 | MR26 | Fresh join at a current snapshot                  | `mr-join.test.ts`       |
 | MR27 | Stored snapshot plus nonempty tail and live race  | `mr-join.test.ts`       |
