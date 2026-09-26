@@ -1,0 +1,57 @@
+{
+  "name": "collab-doc-codec",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Schema-defined documents, readable source, agent editing, and structural/text OT with collaborative undo.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "bun@1.2.5",
+  "engines": {
+    "bun": ">=1.2.5",
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "SPEC.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "bun test tests",
+    "test:watch": "bun test --watch tests",
+    "test:coverage": "bun test --coverage tests",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:core": "tsc --noEmit -p tsconfig.core.json",
+    "lint": "eslint . --max-warnings 0",
+    "deadcode": "knip",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "acceptance:check": "bun run scripts/check-acceptance.ts",
+    "check:dev": "bun run format:check && bun run typecheck && bun run lint && bun run deadcode && bun run test",
+    "check": "bun run format:check && bun run typecheck && bun run lint && bun run deadcode && bun run build && bun run test && bun run acceptance:check && bun run typecheck:core",
+    "clean": "bun run scripts/clean.ts",
+    "build": "bun run clean && bun build ./src/index.ts --outdir ./dist --target browser --format esm --sourcemap=external && tsc -p tsconfig.build.json",
+    "test:property": "PROPERTY_BUDGET=2000 PROPERTY_STEPS=120 bun test tests/unit/transform-properties.test.ts tests/acceptance/r-simulation.test.ts tests/acceptance/q.test.ts --timeout 600000"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/bun": "^1.3.0",
+    "eslint": "^9.39.1",
+    "knip": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AnimaticML/CollabDocCodec.git"
+  }
+}

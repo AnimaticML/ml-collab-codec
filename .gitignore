@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.artifacts/
+.reference/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+# Local Claude desktop preview config (machine-specific paths).
+.claude/

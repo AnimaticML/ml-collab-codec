@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Runtime check</title>
+  </head>
+  <body>
+    <!-- Runs the built-package runtime check (Q01) in a real browser; serve the repository root. -->
+    <pre id="out">running</pre>
+    <script type="module">
+      const out = document.getElementById("out");
+      const logs = [];
+      const original = console.log;
+      console.log = (...args) => {
+        logs.push(args.join(" "));
+        original(...args);
+      };
+      import("./runtime-check.mjs").then(
+        () => {
+          out.textContent = logs.join("\n");
+          document.body.dataset.result = logs.includes("RUNTIME_CHECK_OK") ? "ok" : "missing";
+        },
+        (error) => {
+          out.textContent = `FAILED: ${error}`;
+          document.body.dataset.result = "failed";
+        },
+      );
+    </script>
+  </body>
+</html>

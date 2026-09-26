@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/index.ts",
+    "tests/**/*.test.ts",
+    "scripts/*.ts",
+    "examples/*.ts",
+    "tests/fixtures/*-process.ts",
+    "tests/fixtures/consumer-types/consumer.ts"
+  ],
+  "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts", "examples/**/*.ts"],
+  "includeEntryExports": true
+}

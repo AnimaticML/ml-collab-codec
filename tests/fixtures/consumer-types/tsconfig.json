@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "types": [],
+    "paths": { "collab-doc-codec": ["../../../dist/types/index.d.ts"] }
+  },
+  "files": ["consumer.ts"]
+}
