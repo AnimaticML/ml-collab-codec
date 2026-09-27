@@ -301,10 +301,9 @@ Killed by 142 test(s):
 
 a retried request is decided again instead of returning its receipt (`src/core/authority.ts`).
 
-Killed by 32 test(s):
+Killed by 30 test(s):
 
 - P03 Conflicting duplicate identity
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - Q03 Property and negative-control quality
 - R10–R15 reversible records, composition, and grouping > R12 Numeric profile: apply, undo, and arithmetic boundaries
 - R10–R15 reversible records, composition, and grouping > R14 Coalescing stops at the sent-request boundary
@@ -320,7 +319,6 @@ Killed by 32 test(s):
 - R35–R40 control, reversible records, checkpoints, and composition policy > R39 Checkpoint cut, failure, and deduplication
 - O02 Delta delivery is deduplicated
 - P03 Conflicting duplicate identity
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - Q03 Property and negative-control quality
 - R10–R15 reversible records, composition, and grouping > R12 Numeric profile: apply, undo, and arithmetic boundaries
 - R10–R15 reversible records, composition, and grouping > R14 Coalescing stops at the sent-request boundary
@@ -340,11 +338,10 @@ Killed by 32 test(s):
 
 a candidate that fails to apply is admitted as a no-op (`src/core/authority-evaluate.ts`).
 
-Killed by 18 test(s):
+Killed by 16 test(s):
 
 - P02 Rejection with dependent pending edits
 - P03 Conflicting duplicate identity
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - R10–R15 reversible records, composition, and grouping > R12 Numeric profile: apply, undo, and arithmetic boundaries
 - MR32–MR33 checkpoint integrity and retention races > MR33 Retention races and retry boundaries
 - R01–R06 occurrence identity and sequence transformation > R06 Old-value preconditions are not target search
@@ -353,7 +350,6 @@ Killed by 18 test(s):
 - O11 Concurrent moves cannot create a cycle
 - P02 Rejection with dependent pending edits
 - P03 Conflicting duplicate identity
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - R10–R15 reversible records, composition, and grouping > R12 Numeric profile: apply, undo, and arithmetic boundaries
 - MR32–MR33 checkpoint integrity and retention races > MR33 Retention races and retry boundaries
 - R01–R06 occurrence identity and sequence transformation > R06 Old-value preconditions are not target search
@@ -365,27 +361,23 @@ Killed by 18 test(s):
 
 a checkpoint cut is taken one record past the durable position (`src/core/host.ts`).
 
-Killed by 4 test(s):
+Killed by 2 test(s):
 
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR39–MR40 asynchronous hosting > MR40 Async checkpoint cut, interruption, and ownership
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR39–MR40 asynchronous hosting > MR40 Async checkpoint cut, interruption, and ownership
 
 ## premature-publication
 
 a decision is installed before its durable append (`src/core/host.ts`).
 
-Killed by 14 test(s):
+Killed by 12 test(s):
 
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR39–MR40 asynchronous hosting > MR39 Delayed durable append: no publication before durability, serialized, fenced, deduplicated
 - MR39–MR40 asynchronous hosting > MR40 Async checkpoint cut, interruption, and ownership
 - R50–R54 revisions, deduplication, hosting, profile, and presence > R52 One logical authority has a host-independent atomic contract
 - R33 negative controls: history, publication, and runtime faults are detected > R33 Negative controls detect wrong-but-green history implementations
 - R35–R40 control, reversible records, checkpoints, and composition policy > R38 Retained undo/redo survives checkpoint truncation and restart
 - R35–R40 control, reversible records, checkpoints, and composition policy > R39 Checkpoint cut, failure, and deduplication
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR39–MR40 asynchronous hosting > MR39 Delayed durable append: no publication before durability, serialized, fenced, deduplicated
 - MR39–MR40 asynchronous hosting > MR40 Async checkpoint cut, interruption, and ownership
 - R50–R54 revisions, deduplication, hosting, profile, and presence > R52 One logical authority has a host-independent atomic contract
@@ -397,24 +389,20 @@ Killed by 14 test(s):
 
 an async result for superseded inputs is installed (`src/runtime/derived.ts`).
 
-Killed by 4 test(s):
+Killed by 2 test(s):
 
 - MR22–MR24 asynchronous derived state and scheduled work > MR23 Replaced, removed, redefined, failed, and stale async jobs never publish
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR22–MR24 asynchronous derived state and scheduled work > MR23 Replaced, removed, redefined, failed, and stale async jobs never publish
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 
 ## snapshot-tail-gap
 
 the first transition after the snapshot is skipped during join (`src/core/join.ts`).
 
-Killed by 8 test(s):
+Killed by 6 test(s):
 
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR25–MR28 snapshot-based join > MR27 Stored snapshot plus nonempty tail and a live race
 - MR29–MR31 history restoration and permissions > MR29 Pre-snapshot own undo/redo with retained handles after pruning
 - MR29–MR31 history restoration and permissions > MR30 Stale session versus a newer snapshot
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR25–MR28 snapshot-based join > MR27 Stored snapshot plus nonempty tail and a live race
 - MR29–MR31 history restoration and permissions > MR29 Pre-snapshot own undo/redo with retained handles after pruning
 - MR29–MR31 history restoration and permissions > MR30 Stale session versus a newer snapshot
@@ -423,15 +411,13 @@ Killed by 8 test(s):
 
 exported sessions drop their undo groups (`src/core/client-session.ts`).
 
-Killed by 12 test(s):
+Killed by 10 test(s):
 
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR29–MR31 history restoration and permissions > MR29 Pre-snapshot own undo/redo with retained handles after pruning
 - MR29–MR31 history restoration and permissions > MR30 Stale session versus a newer snapshot
 - MR29–MR31 history restoration and permissions > MR31 History delivery and permissions
 - R33 negative controls: history, publication, and runtime faults are detected > R33 Negative controls detect wrong-but-green history implementations
 - R35–R40 control, reversible records, checkpoints, and composition policy > R38 Retained undo/redo survives checkpoint truncation and restart
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - MR29–MR31 history restoration and permissions > MR29 Pre-snapshot own undo/redo with retained handles after pruning
 - MR29–MR31 history restoration and permissions > MR30 Stale session versus a newer snapshot
 - MR29–MR31 history restoration and permissions > MR31 History delivery and permissions
@@ -442,9 +428,8 @@ Killed by 12 test(s):
 
 final-candidate validation ignores the rows the changes touched (`src/core/invariants.ts`).
 
-Killed by 22 test(s):
+Killed by 20 test(s):
 
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - R01–R06 occurrence identity and sequence transformation > R05 Authoritative invariants and correct no-op classification
 - R45–R49 identity, context, placement, and finality > R49 Invariant and incompatible-write outcomes remain final
 - R50–R54 revisions, deduplication, hosting, profile, and presence > R51 Deduplication survives rejection, holes, pruning, and restart
@@ -455,7 +440,6 @@ Killed by 22 test(s):
 - O04 Minimum collection, A first
 - O05 Minimum collection, B first
 - O15 Invalid final batch is atomic
-- R30 generated multi-client histories > R30 Generated multi-client histories converge under the fixed authority decisions
 - R01–R06 occurrence identity and sequence transformation > R05 Authoritative invariants and correct no-op classification
 - R45–R49 identity, context, placement, and finality > R49 Invariant and incompatible-write outcomes remain final
 - R50–R54 revisions, deduplication, hosting, profile, and presence > R51 Deduplication survives rejection, holes, pruning, and restart

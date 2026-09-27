@@ -60,3 +60,21 @@ it reports 7 passed and 4 failed: V4 and P1 call removed APIs (`schemaInvariants
 writes through borrowed arrays, which the owner's policy does not require. The ported copy
 (`tests/fixtures/review-probes-adapted.mjs`, changes listed in its header) passes 11/11 in
 MR44 and records the unguarded cast write as an observation.
+
+## Commands and results (2026-09-27)
+
+Environment: Bun 1.2.5, Node 20.11.0, TypeScript 5.9.3, Linux x64.
+
+| Command                    | Result                                                                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run check`            | exit 0; 187 tests across 44 files; 158 scenario IDs (60 baseline, 54 revision, 44 remediation) with active tests                       |
+| `bun run test:property`    | exit 0; 17 tests; algebra 20,000 seeds ×2 sweeps, 1,000 histories × 120 steps, 2,000 diff-law and 5,000 differential seeds; 1 min 13 s |
+| `bun run ot:report`        | 10,658 pair cases, 169 cells, 0 failures; generated sweeps 3,000 + 3,000 seeds, 0 failures                                             |
+| `bun run test:mutation`    | 15 faults, 0 survived (killing tests listed per fault)                                                                                 |
+| `bun run bench`            | medians/p95 recorded in `reports/benchmarks.md`; every measured admission applied                                                      |
+| `bun run probe:live`       | not run with credentials: every provider reports `skipped` (opt-in); no live evidence is claimed                                       |
+| Historical probes (orig.)  | 7 passed, 4 failed (API renames and the non-mandatory deep-freeze expectation; see above)                                              |
+| Historical probes (ported) | 11 passed, 0 failed                                                                                                                    |
+
+Seed budgets are reproducible (`PROPERTY_SEED_START`, per-suite `PROPERTY_BUDGET_*`). These
+runs are evidence of what was exercised, not a proof of the transform algebra.
