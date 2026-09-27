@@ -1,7 +1,7 @@
 // Imports the BUILT package (not source) to exercise a representative core
 // codec/operation/protocol fixture identically across runtimes (SPEC 15/Q01).
 import {
-  registerSchema,
+  defineDocumentSchema,
   parseDocument,
   serializeDocument,
   toTable,
@@ -12,23 +12,24 @@ import {
   SequenceAllocator,
 } from "../../dist/index.js";
 
-const schema = registerSchema({
+const schema = defineDocumentSchema({
   id: "runtime-check",
   version: "1.0.0",
   rootTag: "doc",
-  unknownPolicy: "error",
   components: {
     doc: {
-      tag: "doc",
       identity: "none",
-      properties: {},
       content: { mode: "element", allowedTags: ["p"] },
+      props: { type: "object", properties: {}, additionalProperties: false },
     },
     p: {
-      tag: "p",
       identity: "stable",
-      properties: { value: { type: "number", default: 0, additive: true } },
       content: { mode: "none" },
+      props: {
+        type: "object",
+        properties: { value: { type: "integer", default: 0, "x-additive": true } },
+        additionalProperties: false,
+      },
     },
   },
 });

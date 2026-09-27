@@ -1,6 +1,10 @@
 // Type-level consumer of the built declarations (Q02/R34): a small program
 // compiled with tsc against dist/types only, never against src.
 import {
+  defineDocumentSchema,
+  parseDocument,
+  type DocumentSchemaDefinition,
+  type SchemaProfile,
   Authority,
   Client,
   SequenceAllocator,
@@ -19,10 +23,28 @@ import {
   type UndoResult,
 } from "ml-collab-codec";
 
-const table: Table = toTable(
-  { schemaId: "typed", schemaVersion: "1", root: { tag: "doc", props: {}, content: ["text"] } },
-  createAllocator(),
-);
+// A consumer defines its schema as standard JSON Schema 2020-12 plus the documented annotations.
+const definition: DocumentSchemaDefinition = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  id: "typed",
+  version: "1",
+  rootTag: "doc",
+  components: {
+    doc: {
+      identity: "none",
+      content: { mode: "mixed" },
+      props: {
+        type: "object",
+        properties: { count: { type: "integer", default: 0, "x-additive": true } },
+        additionalProperties: false,
+      },
+    },
+  },
+};
+const schema: SchemaProfile = defineDocumentSchema(definition);
+const parsed = parseDocument("<doc>text</doc>", schema);
+if (!parsed.ok) throw new Error("parse failed");
+const table: Table = toTable(parsed.value, createAllocator());
 const authority = Authority.create("doc", "epoch", table);
 const client = new Client({
   documentId: "doc",

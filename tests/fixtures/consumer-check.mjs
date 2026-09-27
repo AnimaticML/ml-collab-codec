@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  registerSchema,
+  defineDocumentSchema,
   parseDocument,
   serializeDocument,
   toTable,
@@ -64,25 +64,16 @@ function room(table, names, options = {}) {
   return { authority, clients, settle };
 }
 
-const richText = registerSchema({
+const closed = { type: "object", properties: {}, additionalProperties: false };
+const richText = defineDocumentSchema({
+  $schema: "https://json-schema.org/draft/2020-12/schema",
   id: "consumer.rich-text",
   version: "1.0.0",
   rootTag: "doc",
-  unknownPolicy: "error",
   components: {
-    doc: {
-      tag: "doc",
-      identity: "none",
-      properties: {},
-      content: { mode: "mixed", allowedTags: ["p"] },
-    },
-    p: {
-      tag: "p",
-      identity: "stable",
-      properties: {},
-      content: { mode: "mixed", allowedTags: ["em"] },
-    },
-    em: { tag: "em", identity: "none", properties: {}, content: { mode: "mixed" } },
+    doc: { identity: "none", content: { mode: "mixed", allowedTags: ["p"] }, props: closed },
+    p: { identity: "stable", content: { mode: "mixed", allowedTags: ["em"] }, props: closed },
+    em: { identity: "none", content: { mode: "mixed" }, props: closed },
   },
 });
 const print = (table) =>
@@ -146,25 +137,30 @@ const rebased = rebaseProposal(
 check(rebased.status === "rebased", "proposal rebase");
 
 // Numeric board with additive deltas and indexed array editing of equal values.
-const board = registerSchema({
+const board = defineDocumentSchema({
   id: "consumer.board",
   version: "1.0.0",
   rootTag: "board",
-  unknownPolicy: "error",
   components: {
     board: {
-      tag: "board",
       identity: "none",
-      properties: {
-        tags: { type: "array", items: { type: "string" }, commaShorthand: true, minItems: 1 },
-      },
       content: { mode: "element", allowedTags: ["cell"] },
+      props: {
+        type: "object",
+        properties: {
+          tags: { type: "array", items: { type: "string" }, minItems: 1, "x-encoding": "comma" },
+        },
+        additionalProperties: false,
+      },
     },
     cell: {
-      tag: "cell",
       identity: "stable",
-      properties: { value: { type: "number", default: 0, additive: true } },
       content: { mode: "none" },
+      props: {
+        type: "object",
+        properties: { value: { type: "integer", default: 0, "x-additive": true } },
+        additionalProperties: false,
+      },
     },
   },
 });
@@ -228,37 +224,34 @@ check(
 );
 
 // Hidden hand: restricted regions and a trusted action.
-const hidden = registerSchema({
+const required = (name) => ({
+  type: "object",
+  properties: { [name]: { type: "string" } },
+  required: [name],
+  additionalProperties: false,
+});
+const hidden = defineDocumentSchema({
   id: "consumer.hidden",
   version: "1.0.0",
   rootTag: "game",
-  unknownPolicy: "error",
   components: {
     game: {
-      tag: "game",
       identity: "none",
-      properties: {},
       content: { mode: "element", allowedTags: ["table", "hand"] },
+      props: closed,
     },
     table: {
-      tag: "table",
       identity: "stable",
-      properties: {},
       content: { mode: "element", allowedTags: ["card"] },
+      props: closed,
     },
     hand: {
-      tag: "hand",
       identity: "stable",
-      properties: { owner: { type: "string", required: true } },
-      regionOwnerProp: "owner",
       content: { mode: "element", allowedTags: ["card"] },
+      regionOwner: "owner",
+      props: required("owner"),
     },
-    card: {
-      tag: "card",
-      identity: "stable",
-      properties: { rank: { type: "string", required: true } },
-      content: { mode: "none" },
-    },
+    card: { identity: "stable", content: { mode: "none" }, props: required("rank") },
   },
 });
 const gameParsed = parseDocument(

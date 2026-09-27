@@ -8,7 +8,7 @@
   "packageManager": "bun@1.2.5",
   "engines": {
     "bun": ">=1.2.5",
-    "node": ">=22"
+    "node": ">=20.11"
   },
   "main": "./dist/index.js",
   "types": "./dist/types/index.d.ts",
