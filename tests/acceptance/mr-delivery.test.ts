@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CHANGE_KINDS } from "../../src/core/change.ts";
-import { root } from "../support/built.ts";
+import { ensureFreshBuild, root } from "../support/built.ts";
 import { docSnippets, materialize } from "../support/doc-snippets.ts";
 
 const read = (path: string): string => readFileSync(resolve(root, path), "utf8");
@@ -107,5 +107,14 @@ describe("MR42–MR44 consumer documentation, performance evidence, and delivery
       expect(existsSync(resolve(root, "docs", link ?? ""))).toBe(true);
     expect(read("SPEC.md")).toContain("## 19. Remediation");
     expect(read("README.md")).toContain("docs/installation.md");
-  });
+    // The historical review probes, ported to the current API and ownership contract, pass
+    // against the built package (the original file stays unchanged as evidence).
+    ensureFreshBuild();
+    const probes = Bun.spawnSync(
+      ["node", "tests/fixtures/review-probes-adapted.mjs", "dist/index.js"],
+      { cwd: root, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(probes.stdout.toString()).toContain("11 passed; 0 failed; 11 probes.");
+    expect(probes.exitCode).toBe(0);
+  }, 60_000);
 });
