@@ -25,7 +25,11 @@ export interface ProviderExport {
   readonly localOnly: readonly string[];
   readonly incompatibilities: readonly string[];
   readonly measured: Measured;
-  readonly budgets: { readonly maxDepth: Budget; readonly maxProperties: Budget };
+  readonly budgets: {
+    readonly maxDepth: Budget;
+    readonly maxProperties: Budget;
+    readonly maxVariants: Budget;
+  };
 }
 
 function finish(
@@ -43,7 +47,7 @@ function finish(
 ): ProviderExport {
   const measured = measureSchema(base.requestSchema);
   const incompatibilities = [...ctx.incompatibilities];
-  const { maxDepth, maxProperties } = ctx.profile;
+  const { maxDepth, maxProperties, maxVariants } = ctx.profile;
   if (measured.depth > maxDepth.value)
     incompatibilities.push(
       `nesting depth ${measured.depth} exceeds the ${maxDepth.basis} budget ${maxDepth.value}`,
@@ -52,6 +56,10 @@ function finish(
     incompatibilities.push(
       `${measured.properties} properties exceed the ${maxProperties.basis} budget ${maxProperties.value}`,
     );
+  if (measured.variants > maxVariants.value)
+    incompatibilities.push(
+      `${measured.variants} variants exceed the ${maxVariants.basis} budget ${maxVariants.value}`,
+    );
   return {
     ...base,
     profileRetrieved: ctx.profile.retrieved,
@@ -59,7 +67,7 @@ function finish(
     localOnly: [...new Set([...ctx.localOnly, ...localOnly])],
     incompatibilities,
     measured,
-    budgets: { maxDepth, maxProperties },
+    budgets: { maxDepth, maxProperties, maxVariants },
   };
 }
 

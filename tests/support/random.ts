@@ -30,10 +30,18 @@ export function rng(seed: number): Rng {
   };
 }
 
-/** Seed budget: small fixed set in normal CI, larger reproducible budget via PROPERTY_BUDGET. */
-export function seedBudget(defaultCount: number): number[] {
-  const configured = Number(process.env["PROPERTY_BUDGET"] ?? "");
-  const count = Number.isSafeInteger(configured) && configured > 0 ? configured : defaultCount;
+/**
+ * Seed budget for one suite. Normal CI runs `defaultCount` seeds; the larger
+ * reproducible job raises it through `PROPERTY_BUDGET_<SUITE>` or the shared
+ * `PROPERTY_BUDGET`. A configured budget can only raise a suite's count, so
+ * a quick setting for one suite never silently reduces another's coverage.
+ */
+export function seedBudget(defaultCount: number, suite?: string): number[] {
+  const named = suite === undefined ? undefined : process.env[`PROPERTY_BUDGET_${suite}`];
+  const configured = Number(named ?? process.env["PROPERTY_BUDGET"] ?? "");
+  const count = Number.isSafeInteger(configured)
+    ? Math.max(defaultCount, configured)
+    : defaultCount;
   const start = Number(process.env["PROPERTY_SEED_START"] ?? "1");
   return Array.from({ length: count }, (_, i) => (Number.isSafeInteger(start) ? start : 1) + i);
 }

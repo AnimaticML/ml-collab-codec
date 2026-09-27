@@ -195,6 +195,14 @@ const generators: Generator[] = [
     b.moveNode(node.id, to.id, r.int(to.children.length + 1));
     return true;
   },
+  (b, t, r) => {
+    const nodes = containers(t).filter((row) => row.id !== ROOT_ID);
+    if (nodes.length === 0) return false;
+    const node = r.pick(nodes);
+    const tag = r.pick(["p", "h", "em", "q"].filter((candidate) => candidate !== node.tag));
+    b.setTag(node.id, tag);
+    return true;
+  },
 ];
 
 function isWithin(table: Table, id: string, ancestor: string): boolean {

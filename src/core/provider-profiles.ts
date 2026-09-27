@@ -35,6 +35,8 @@ export interface ProviderProfile {
   readonly scalarEnums: boolean;
   readonly maxDepth: Budget;
   readonly maxProperties: Budget;
+  /** `anyOf` branches in the emitted schema (unions of component rows, nullable wrappers). */
+  readonly maxVariants: Budget;
 }
 
 const RETRIEVED = "2026-09-27";
@@ -81,6 +83,11 @@ export const PROVIDER_PROFILES: Readonly<Record<ProviderId, ProviderProfile>> = 
       basis: "internal",
       note: "documented as 100, later reported raised to 5,000 (secondary source); 100 kept as a conservative budget",
     },
+    maxVariants: {
+      value: 64,
+      basis: "internal",
+      note: "no documented limit on anyOf branches; conservative internal budget",
+    },
   },
   anthropic: {
     id: "anthropic",
@@ -114,6 +121,11 @@ export const PROVIDER_PROFILES: Readonly<Record<ProviderId, ProviderProfile>> = 
       value: 200,
       basis: "internal",
       note: "no documented property limit; conservative internal budget",
+    },
+    maxVariants: {
+      value: 64,
+      basis: "internal",
+      note: "no documented limit on anyOf branches; conservative internal budget",
     },
   },
   gemini: {
@@ -149,6 +161,11 @@ export const PROVIDER_PROFILES: Readonly<Record<ProviderId, ProviderProfile>> = 
       value: 200,
       basis: "internal",
       note: "no documented property limit; conservative internal budget",
+    },
+    maxVariants: {
+      value: 64,
+      basis: "internal",
+      note: "no documented limit on anyOf branches; conservative internal budget",
     },
   },
 };

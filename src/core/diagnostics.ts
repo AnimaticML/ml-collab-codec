@@ -67,3 +67,8 @@ export function ok<T>(value: T, diagnostics: readonly Diagnostic[] = []): Result
 export function err<T>(diagnostics: readonly Diagnostic[]): Result<T> {
   return { ok: false, diagnostics };
 }
+
+/** A domain definition (`x-reference: "definition"`) is a unique key; a second one is ambiguous. */
+export function duplicateDefinition(value: string, path: string): Diagnostic {
+  return diag("duplicateId", path, `definition "${value}" is declared more than once`);
+}

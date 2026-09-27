@@ -6,7 +6,8 @@
     "scripts/*.ts",
     "examples/*.ts",
     "tests/fixtures/*-process.ts",
-    "tests/fixtures/consumer-types/consumer.ts"
+    "tests/fixtures/consumer-types/consumer.ts",
+    "tests/mutation/preload.ts"
   ],
   "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts", "examples/**/*.ts"],
   "includeEntryExports": true

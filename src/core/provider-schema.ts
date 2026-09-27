@@ -210,7 +210,9 @@ export function measureSchema(root: JsonObject): Measured {
       ...members.map(depthOf),
       ...branches.map(depthOf),
     );
-    return nested + (schema["type"] === "object" || schema["type"] === "array" ? 1 : 0);
+    // Nullable types are emitted as type arrays, e.g. ["object", "null"].
+    const types = Array.isArray(schema["type"]) ? schema["type"] : [schema["type"]];
+    return nested + (types.includes("object") || types.includes("array") ? 1 : 0);
   };
   return { depth: depthOf(root), properties, variants };
 }

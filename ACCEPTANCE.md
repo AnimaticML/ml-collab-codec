@@ -180,25 +180,48 @@ literal named tests; the file column names where the primary assertions live.
 Normative text: `ML_COLLAB_REMEDIATION_ACCEPTANCE.md`. Each family has at least one literal
 named test; the file column names where the substantive assertions live.
 
-| ID   | Family                                            | Primary tests           |
-| ---- | ------------------------------------------------- | ----------------------- |
-| MR11 | Same-ID node type change                          | `mr-diff.test.ts`       |
-| MR12 | Structural and list diff laws                     | `mr-diff.test.ts`       |
-| MR13 | Granularity and stale agent proposals             | `mr-diff.test.ts`       |
-| MR22 | Async completion reaches dependents               | `mr-runtime.test.ts`    |
-| MR23 | Replaced/stale async computations                 | `mr-runtime.test.ts`    |
-| MR24 | Coherent publication and scheduled work           | `mr-runtime.test.ts`    |
-| MR25 | Snapshot is state, not genesis replay             | `mr-join.test.ts`       |
-| MR26 | Fresh join at a current snapshot                  | `mr-join.test.ts`       |
-| MR27 | Stored snapshot plus nonempty tail and live race  | `mr-join.test.ts`       |
-| MR28 | Join keeps addresses and permits contextual edits | `mr-join.test.ts`       |
-| MR29 | Pre-snapshot own undo/redo with retained handles  | `mr-history.test.ts`    |
-| MR30 | Stale session versus newer snapshot               | `mr-history.test.ts`    |
-| MR31 | History delivery and permissions                  | `mr-history.test.ts`    |
-| MR32 | Corrupt checkpoint rejection                      | `mr-checkpoint.test.ts` |
-| MR33 | Retention races and retry boundaries              | `mr-checkpoint.test.ts` |
-| MR39 | Delayed durable append                            | `mr-host.test.ts`       |
-| MR40 | Async checkpoint cut and ownership                | `mr-host.test.ts`       |
+| ID   | Family                                                 | Primary tests             |
+| ---- | ------------------------------------------------------ | ------------------------- |
+| MR01 | Standard schema input and migration                    | `mr-schema.test.ts`       |
+| MR02 | Recursive validation of containers                     | `mr-schema.test.ts`       |
+| MR03 | Entry-point equivalence and final-candidate validation | `mr-schema.test.ts`       |
+| MR04 | Defaults without hidden corrections                    | `mr-schema.test.ts`       |
+| MR05 | Unknown properties at every depth                      | `mr-schema.test.ts`       |
+| MR06 | References and global constraints                      | `mr-schema.test.ts`       |
+| MR07 | Malformed schemas and bounded input                    | `mr-schema.test.ts`       |
+| MR08 | Complete opaque and mixed-content round-trip           | `mr-codec.test.ts`        |
+| MR09 | Root and fragment API honesty                          | `mr-codec.test.ts`        |
+| MR10 | Root identity and interpretation metadata              | `mr-codec.test.ts`        |
+| MR11 | Same-ID node type change                               | `mr-diff.test.ts`         |
+| MR12 | Structural and list diff laws                          | `mr-diff.test.ts`         |
+| MR13 | Granularity and stale agent proposals                  | `mr-diff.test.ts`         |
+| MR14 | Component versus document schema exports               | `mr-provider.test.ts`     |
+| MR15 | Typed projection and mixed text                        | `mr-provider.test.ts`     |
+| MR16 | Real limits and enforcement reports                    | `mr-provider.test.ts`     |
+| MR17 | Decoder validation and exceptional responses           | `mr-provider.test.ts`     |
+| MR18 | Provider evidence and test environment                 | `mr-provider.test.ts`     |
+| MR19 | Read-only types and supported mutation boundary        | `mr-ownership.test.ts`    |
+| MR20 | Input ownership and free-edit copies                   | `mr-ownership.test.ts`    |
+| MR21 | Wire/history stability and staged failure              | `mr-ownership.test.ts`    |
+| MR22 | Async completion reaches dependents                    | `mr-runtime.test.ts`      |
+| MR23 | Replaced/stale async computations                      | `mr-runtime.test.ts`      |
+| MR24 | Coherent publication and scheduled work                | `mr-runtime.test.ts`      |
+| MR25 | Snapshot is state, not genesis replay                  | `mr-join.test.ts`         |
+| MR26 | Fresh join at a current snapshot                       | `mr-join.test.ts`         |
+| MR27 | Stored snapshot plus nonempty tail and live race       | `mr-join.test.ts`         |
+| MR28 | Join keeps addresses and permits contextual edits      | `mr-join.test.ts`         |
+| MR29 | Pre-snapshot own undo/redo with retained handles       | `mr-history.test.ts`      |
+| MR30 | Stale session versus newer snapshot                    | `mr-history.test.ts`      |
+| MR31 | History delivery and permissions                       | `mr-history.test.ts`      |
+| MR32 | Corrupt checkpoint rejection                           | `mr-checkpoint.test.ts`   |
+| MR33 | Retention races and retry boundaries                   | `mr-checkpoint.test.ts`   |
+| MR34 | Complete ordered-pair inventory                        | `mr-ot-pairs.test.ts`     |
+| MR35 | Boundary geometries and independent oracles            | `mr-ot-pairs.test.ts`     |
+| MR36 | Generators cannot hide failures                        | `mr-ot-generated.test.ts` |
+| MR37 | State-machine histories, not only pairs                | `mr-ot-histories.test.ts` |
+| MR38 | Negative controls and fault sensitivity                | `mr-mutation.test.ts`     |
+| MR39 | Delayed durable append                                 | `mr-host.test.ts`         |
+| MR40 | Async checkpoint cut and ownership                     | `mr-host.test.ts`         |
 
 ## Required expansion beyond the baseline
 

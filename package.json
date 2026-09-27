@@ -39,8 +39,11 @@
     "check": "bun run format:check && bun run typecheck && bun run lint && bun run deadcode && bun run build && bun run test && bun run acceptance:check && bun run typecheck:core",
     "clean": "bun run scripts/clean.ts",
     "build": "bun run clean && bun build ./src/index.ts --outdir ./dist --target browser --format esm --sourcemap=external && tsc -p tsconfig.build.json",
-    "test:property": "PROPERTY_BUDGET=2000 PROPERTY_STEPS=120 bun test tests/unit/transform-properties.test.ts tests/acceptance/r-simulation.test.ts tests/acceptance/q.test.ts --timeout 600000",
-    "bench": "bun run scripts/bench.ts"
+    "test:property": "PROPERTY_BUDGET_ALGEBRA=20000 PROPERTY_BUDGET_HISTORY=1000 PROPERTY_BUDGET_SCHEMA=5000 PROPERTY_BUDGET=2000 PROPERTY_STEPS=120 bun test tests/acceptance/mr-ot-generated.test.ts tests/acceptance/mr-ot-histories.test.ts tests/acceptance/mr-diff.test.ts tests/acceptance/mr-schema.test.ts tests/acceptance/r-simulation.test.ts tests/acceptance/q.test.ts --timeout 1800000",
+    "bench": "bun run scripts/bench.ts",
+    "ot:report": "bun run scripts/ot-report.ts && prettier --write reports/ot-pair-coverage.md",
+    "probe:live": "bun run scripts/probe-live.ts",
+    "test:mutation": "bun run scripts/mutation-report.ts && prettier --write reports/mutation-report.md"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

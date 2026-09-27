@@ -132,14 +132,23 @@ describe("R30 generated multi-client histories", () => {
         );
       }
     }
-    // The generator really exercises acceptance, rejection, undo, and reconnect.
-    const r = rng(7);
-    const room = new Room(randomTable(r));
-    NAMES.forEach((name) => room.join(name, `replica-${name}`));
-    for (let i = 0; i < 200; i += 1) step(room, r);
-    room.settle();
-    const outcomes = room.decisions.map((d) => (d.kind === "decided" ? d.receipt.outcome : d.kind));
-    expect(outcomes.filter((o) => o === "applied").length).toBeGreaterThan(10);
-    expect(room.authority.transitionsSince(0)?.some((t) => t.meta.undoOf !== undefined)).toBe(true);
+    // The generator really exercises acceptance, rejection, undo, and reconnect (across seeds:
+    // a single fixed seed says little about the distribution once generators change).
+    let applied = 0;
+    let undone = 0;
+    for (let seed = 7; seed < 27; seed += 1) {
+      const r = rng(seed);
+      const room = new Room(randomTable(r));
+      NAMES.forEach((name) => room.join(name, `replica-${name}`));
+      for (let i = 0; i < 200; i += 1) step(room, r);
+      room.settle();
+      applied += room.decisions.filter(
+        (d) => d.kind === "decided" && d.receipt.outcome === "applied",
+      ).length;
+      if (room.authority.transitionsSince(0)?.some((t) => t.meta.undoOf !== undefined)) undone += 1;
+    }
+    expect(applied).toBeGreaterThan(200);
+    // Most generated undos cancel still-unsent work locally; confirmed undos must still occur.
+    expect(undone).toBeGreaterThan(0);
   });
 });

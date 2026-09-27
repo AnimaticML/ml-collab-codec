@@ -3,7 +3,7 @@ import type { Change } from "./change.ts";
 import { subtreeIds } from "./change.ts";
 import type { ComponentSchema, PropertySchema, SchemaProfile } from "./schema.ts";
 import { getComponentSchema, propertyAtPath } from "./schema.ts";
-import { type Diagnostic, diag } from "./diagnostics.ts";
+import { type Diagnostic, diag, duplicateDefinition } from "./diagnostics.ts";
 import { normalizeComponentProps } from "./normalize.ts";
 import { normalizeDocument } from "./document-check.ts";
 import type { Table, TableNode } from "./table.ts";
@@ -71,6 +71,7 @@ function touchesRoles(
 
 function referenceIssues(table: Table, profile: SchemaProfile): Diagnostic[] {
   const definitions = new Set<string>();
+  const duplicates: Diagnostic[] = [];
   const references: { value: string; path: string }[] = [];
   const walk = (
     schema: PropertySchema | undefined,
@@ -78,7 +79,10 @@ function referenceIssues(table: Table, profile: SchemaProfile): Diagnostic[] {
     path: string,
   ): void => {
     if (schema === undefined || value === undefined || schema.variants === true) return;
-    if (typeof value === "string" && schema.reference === "definition") definitions.add(value);
+    if (typeof value === "string" && schema.reference === "definition") {
+      if (definitions.has(value)) duplicates.push(duplicateDefinition(value, path));
+      definitions.add(value);
+    }
     if (typeof value === "string" && schema.reference === "reference")
       references.push({ value, path });
     if (Array.isArray(value))
@@ -90,15 +94,18 @@ function referenceIssues(table: Table, profile: SchemaProfile): Diagnostic[] {
   for (const row of table.values())
     if (componentHasRoles(profile, row.tag))
       walk(getComponentSchema(profile, row.tag)?.props, row.props, `${row.id}.props`);
-  return references
-    .filter((reference) => !definitions.has(reference.value))
-    .map((reference) =>
-      diag(
-        "danglingReference",
-        reference.path,
-        `reference "${reference.value}" has no matching definition`,
+  return [
+    ...duplicates,
+    ...references
+      .filter((reference) => !definitions.has(reference.value))
+      .map((reference) =>
+        diag(
+          "danglingReference",
+          reference.path,
+          `reference "${reference.value}" has no matching definition`,
+        ),
       ),
-    );
+  ];
 }
 
 function affectedRows(changes: readonly Change[], table: Table): Set<string> {

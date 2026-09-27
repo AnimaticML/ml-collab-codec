@@ -1,6 +1,6 @@
 import type { ComponentNode, ContentItem, DocumentModel, JsonValue } from "./types.ts";
 import type { ComponentSchema, PropertySchema, SchemaProfile } from "./schema.ts";
-import { type Diagnostic, type Result, diag, err, ok } from "./diagnostics.ts";
+import { type Diagnostic, type Result, diag, duplicateDefinition, err, ok } from "./diagnostics.ts";
 import { normalizeComponentProps } from "./normalize.ts";
 
 /** Resource bounds for documents accepted from any entry path. */
@@ -28,7 +28,10 @@ function collectRoles(
   state: State,
 ): void {
   if (schema === undefined || value === undefined || schema.variants === true) return;
-  if (typeof value === "string" && schema.reference === "definition") state.definitions.add(value);
+  if (typeof value === "string" && schema.reference === "definition") {
+    if (state.definitions.has(value)) state.diagnostics.push(duplicateDefinition(value, path));
+    state.definitions.add(value);
+  }
   if (typeof value === "string" && schema.reference === "reference")
     state.references.push({ value, path });
   if (Array.isArray(value))

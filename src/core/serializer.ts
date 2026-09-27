@@ -1,4 +1,5 @@
-import type { ComponentNode, ContentItem, DocumentModel, JsonValue } from "./types.ts";
+import type { ComponentNode, ContentItem, DocumentModel, JsonObject, JsonValue } from "./types.ts";
+import { copyJsonStrict } from "./json-copy.ts";
 import type { PropertySchema, SchemaProfile } from "./schema.ts";
 import { getComponentSchema, propertyAtPath } from "./schema.ts";
 import { deepEqual } from "./normalize.ts";
@@ -10,7 +11,9 @@ import { propertyToAttributeName } from "./naming.ts";
  * components and structured values of unknown opaque components. A value is
  * written as an attribute only when the parser provably decodes that
  * attribute back to the same property and value; everything else goes into
- * the component's JSON block.
+ * the component's JSON block. A value JSON cannot represent (a non-finite
+ * number, an unsafe key, a cycle) throws a `DiagnosticError`: nothing is
+ * printed rather than printing something different.
  */
 function escapeText(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -72,7 +75,9 @@ function encodeProps(
   const root = getComponentSchema(profile, node.tag)?.props;
   const attributes: string[] = [];
   const json: Record<string, JsonValue> = {};
-  for (const [name, value] of Object.entries(node.props)) {
+  // Refuse (DiagnosticError) what JSON cannot carry, e.g. NaN, instead of printing it as null.
+  const props = copyJsonStrict(node.props, `<${node.tag}>`) as JsonObject;
+  for (const [name, value] of Object.entries(props)) {
     // The same lookup the parser uses to decode an attribute of this name.
     const schema = propertyAtPath(root, [name]);
     if (schema?.default !== undefined && deepEqual(value, schema.default)) continue;
