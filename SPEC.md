@@ -1,7 +1,9 @@
-# Structured Document Library — behavioral specification
+# ml-collab-codec — behavioral specification
 
-**Version:** implementation handoff 1.0, 2026-09-22, amended by OT revision v3, 2026-09-24.  
-**Status:** implemented; section 18 records the v3 operation/collaboration/history decisions.  
+**Version:** implementation handoff 1.0, 2026-09-22, amended by OT revision v3, 2026-09-24,
+and by the remediation handoff (`ML_COLLAB_REMEDIATION.md`), 2026-09-27.  
+**Status:** implemented; section 18 records the v3 operation/collaboration/history decisions and
+section 19 the remediation contracts, which supersede the rows they name.  
 **Language/runtime:** TypeScript; Bun for development and tests.
 
 This document consolidates the two supplied Russian handoffs and subsequent owner
@@ -673,42 +675,32 @@ Do not mark a choice "verified" without the corresponding runnable tests.
 
 ### 17.1. Implemented choices (v1)
 
-| Decision                   | Choice made                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Why / evidence                                                                                                                   |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Structural model           | `ComponentNode { id?, tag, props, content? }`, `ContentItem = string \| ComponentNode`; schema dialect is the compact local profile in `src/core/schema.ts`. The operational table (`src/core/table.ts`) holds rows with ordered `children` id lists (v3: positions are indexes transformed in context; the former client-chosen fractional `orderKey` was removed). Text runs are `#text` rows; adjacent runs and empty runs are one effective string in `fromTable`.                                                                                                                                                                                                                                                                                                                                         | C01/I01; R01–R09.                                                                                                                |
-| Canonical values           | Unset is represented internally by key omission (never a stored `null`). Effective-value normalization lives in `src/core/normalize.ts` and is reused unchanged by the codec (C02/C03) and by provider decode (S03) — one function, two callers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Matches SPEC §3.1 exactly; C03/S03 assert identical outcomes from omission/null/explicit-default.                                |
-| Attribute/property naming  | Retained the legacy hyphen⇄camelCase mapping verbatim (`src/core/naming.ts`); reversibility checked by round-tripping the derived attribute spelling back through the same function before using it in `print` (C09/C10).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Required "must be reversible for the schema profile" rule (§4.1); a property that doesn't round-trip falls back to a JSON block. |
-| JSON-block precedence      | All attributes processed first into a merge tree, then all `<script type="application/json">` blocks merged on top in source order (recursive object merge, array replace); `data-property` targets a dot-path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Matches §4.1 exactly; C07/C10 assert JSON always wins regardless of source position.                                             |
-| Whitespace/content modes   | Three modes on `ComponentSchema.content.mode`: `mixed` (verbatim), `element` (whitespace-only text dropped, non-whitespace text is an error), `none` (no content). No implicit Unicode normalization; text offsets are Unicode code points throughout (`[...text].length`, never UTF-16 length).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | C13, I03 (emoji/combining-mark offsets), §4.3/§10.                                                                               |
-| Split-boundary affinity    | Text inserted exactly at a split point stays with the left (original) run; a split point moves after text inserted at it; a caret anchor chooses by its `affinity`. Two splits of one run at the same point: the lower stable origin is the outer cut.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | O13, R07, R29.                                                                                                                   |
-| ID granularity             | `ComponentSchema.identity: "stable" \| "none"`. Stable IDs are assigned by the schema author at structural boundaries (paragraphs/blocks/cards/etc in the fixtures); plain text runs and un-identified components get **ephemeral** ids from a session-local allocator (`createAllocator`), never persisted (`TableNode.persisted`). Move keeps the id; copy/insert always mints a new one; split/merge mint/drop ids explicitly (`splitText`/`mergeText` ops).                                                                                                                                                                                                                                                                                                                                                | I01/I02; matches §6 ("not automatically at every JSON object... or every character").                                            |
-| Operation wire format      | Superseded by v3 (§18.3): twelve self-contained reversible primitives (`sdl.ops/1`: `set`, `delta`, `arrayInsert/Delete/Move`, `textInsert/Delete`, `nodeInsert/Delete/Move`, `split`, `merge`), each with a stable origin; the value-search `removeArrayItem` was removed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | R01–R13, R36.                                                                                                                    |
-| Transform matrix           | Superseded by v3 (§18.4): a full pairwise inclusion transform over all twelve primitives (`src/core/transform*.ts`), with expansion (deletions split around surviving insertions), origin-ordered ties, and explicit conflict policies.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | TP1 property test, R01–R09, R36.                                                                                                 |
-| Numeric model              | Superseded by v3 (§18.5): additive deltas use JSON safe integers only (value, delta, and result); anything else is `numericProfile` rejected. Ordinary numbers remain settable.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | R12.                                                                                                                             |
-| OT implementation          | Superseded by v3 (§18.1–18.8): one logical authority per document, scalar confirmed prefix, paired inclusion transformation, forward rebasing with private recovery.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | R35, R45–R53.                                                                                                                    |
-| History bounds             | Superseded by v3 (§18.11): separate transform, deduplication, archive, and undo-handle horizons; unavailable context is an explicit `resync`/`unavailable` result.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | R31, R37–R39, R51.                                                                                                               |
-| Unknown data               | Default `unknownPolicy: "error"` rejects unknown tags/properties (`unknownTag`/`unknownProperty` diagnostics); `ComponentSchema.allowOpaqueProperties` is the explicit, local, opt-in escape hatch that retains extra properties verbatim without interpreting them. No blanket "any" fallback.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | C11.                                                                                                                             |
-| Provider profiles          | `src/core/providers.ts` holds a small dated capability table (OpenAI/Gemini/Anthropic) with `retrievedDate`, `allowsOptionalOmission`, `supportsRecursiveRefs`, a `supportedKeywords` set, and `maxDepth`/`maxProperties`. Export returns representation (native/projected), generation-enforced vs runtime-only constraint lists, and incompatibility diagnostics — never a silently-weakened schema. **These capability values are conservative placeholders written from the referenced docs at packaging time, not live-reverified** (see "Known limitations" below); they are clearly the kind of thing SPEC §12.3 says must be rechecked before production use, and the code path that would do that (`ProviderResponse`/live probes) is present but has no wired-up real HTTP client — see limitations. | S01/S02/S05.                                                                                                                     |
-| Recursive/projected export | Native export (`exportComponentSchema`) for providers whose capability declares `supportsRecursiveRefs`; a typed flat node-table projection (`exportNodeTableSchema`, reusing the same `TableNode` shape as the OT engine) for the others. Decode (`decodeNodeTable`) validates single-root, dangling-reference, duplicate-id, and cycle before returning a document, and never invents a persisted id for a row whose wire `id` is `null`.                                                                                                                                                                                                                                                                                                                                                                    | S04/S06/S07.                                                                                                                     |
-| HTML envelope              | `src/adapters/browser.ts`: the tagged source is embedded as an escaped `JSON.stringify` string inside `<script type="application/json" id="doc-payload">`, with `</` replaced by `<\/` to prevent premature termination/script injection; extraction is plain string scanning (no DOMParser). Verified by an actual browser load (see delivery notes) as well as C12/Q01.                                                                                                                                                                                                                                                                                                                                                                                                                                      | C12, Q01 (real browser + Bun + Node + a Node worker).                                                                            |
-| Region contract            | `ComponentSchema.regionOwnerProp` marks a subtree as a homogeneous region owned by that property's string value; `regionOwner` walks up to the nearest marker, default is `"public"`. `RestrictedAuthority` wraps `Authority` with `view(principal)` (projection), `submitScoped` (ordinary edits rejected if they touch a forbidden region, generic "not authorized" reason — no existence disclosure), and `submitAction` (a registered, trusted handler that computes ops from current state and a principal, checked synchronously at the same call that commits — no separate "already validated" trust). Fine-grained per-field filtering was explicitly not attempted, per SPEC §13.                                                                                                                    | V01–V07.                                                                                                                         |
-| Packaging/license          | Owner selected Apache-2.0 (2026-09-26): `LICENSE` added, `"license": "Apache-2.0"`, public GitHub repository `AnimaticML/ml-collab-codec`. `package.json` stays `"private": true` so nothing is published to npm without a separate release decision. `.bun-version`/`packageManager` were lowered from `1.3.3` to the installed `1.2.5` (the specified version was unavailable in this environment); this is a reproducibility/tooling correction, not a product decision.                                                                                                                                                                                                                                                                                                                                    | —                                                                                                                                |
+| Decision                   | Choice made                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Why / evidence                                                                                                                   |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Structural model           | `ComponentNode { id?, tag, props, content? }`, `ContentItem = string \| ComponentNode`. Schemas are JSON Schema 2020-12 manifests compiled by `defineDocumentSchema` (§19.1; the compact profile is an import format). The operational table holds rows with ordered `children` id lists; text runs are `#text` rows; `$root` keeps the document's own id in `rootId` (§19.2).                                                                                              | C01/I01; R01–R09; MR01, MR10.                                                                                                    |
+| Canonical values           | Unset is represented internally by key omission (never a stored `null`). Effective-value normalization lives in `src/core/normalize.ts` and is reused unchanged by the codec (C02/C03) and by provider decode (S03) — one function, two callers.                                                                                                                                                                                                                            | Matches SPEC §3.1 exactly; C03/S03 assert identical outcomes from omission/null/explicit-default.                                |
+| Attribute/property naming  | Retained the legacy hyphen⇄camelCase mapping verbatim (`src/core/naming.ts`); reversibility checked by round-tripping the derived attribute spelling back through the same function before using it in `print` (C09/C10).                                                                                                                                                                                                                                                   | Required "must be reversible for the schema profile" rule (§4.1); a property that doesn't round-trip falls back to a JSON block. |
+| JSON-block precedence      | All attributes processed first into a merge tree, then all `<script type="application/json">` blocks merged on top in source order (recursive object merge, array replace); `data-property` targets a dot-path.                                                                                                                                                                                                                                                             | Matches §4.1 exactly; C07/C10 assert JSON always wins regardless of source position.                                             |
+| Whitespace/content modes   | Three modes on `ComponentSchema.content.mode`: `mixed` (verbatim), `element` (whitespace-only text dropped, non-whitespace text is an error), `none` (no content). No implicit Unicode normalization; text offsets are Unicode code points throughout (`[...text].length`, never UTF-16 length).                                                                                                                                                                            | C13, I03 (emoji/combining-mark offsets), §4.3/§10.                                                                               |
+| Split-boundary affinity    | Text inserted exactly at a split point stays with the left (original) run; a split point moves after text inserted at it; a caret anchor chooses by its `affinity`. Two splits of one run at the same point: the lower stable origin is the outer cut.                                                                                                                                                                                                                      | O13, R07, R29.                                                                                                                   |
+| ID granularity             | `ComponentSchema.identity: "stable" \| "none"`. Stable IDs are assigned by the schema author at structural boundaries (paragraphs/blocks/cards/etc in the fixtures); plain text runs and un-identified components get **ephemeral** ids from a session-local allocator (`createAllocator`), never persisted (`TableNode.persisted`). Move keeps the id; copy/insert always mints a new one; split/merge mint/drop ids explicitly (`splitText`/`mergeText` ops).             | I01/I02; matches §6 ("not automatically at every JSON object... or every character").                                            |
+| Operation wire format      | Superseded by v3 (§18.3) and §19.3: thirteen self-contained reversible primitives (`sdl.ops/2`: `set`, `delta`, `arrayInsert/Delete/Move`, `textInsert/Delete`, `nodeInsert/Delete/Move`, `split`, `merge`, `setTag`), each with a stable origin; the old value-search array removal was removed.                                                                                                                                                                           | R01–R13, R36, MR11.                                                                                                              |
+| Transform matrix           | Superseded by v3 (§18.4) and §19.5: a full pairwise inclusion transform over all thirteen primitives, with expansion, origin-ordered ties, and explicit conflict policies, covered by the 13×13 pair matrix.                                                                                                                                                                                                                                                                | MR34–MR38.                                                                                                                       |
+| Numeric model              | Superseded by v3 (§18.5): additive deltas use JSON safe integers only (value, delta, and result); anything else is `numericProfile` rejected. Ordinary numbers remain settable.                                                                                                                                                                                                                                                                                             | R12.                                                                                                                             |
+| OT implementation          | Superseded by v3 (§18.1–18.8): one logical authority per document, scalar confirmed prefix, paired inclusion transformation, forward rebasing with private recovery.                                                                                                                                                                                                                                                                                                        | R35, R45–R53.                                                                                                                    |
+| History bounds             | Superseded by v3 (§18.11): separate transform, deduplication, archive, and undo-handle horizons; unavailable context is an explicit `resync`/`unavailable` result.                                                                                                                                                                                                                                                                                                          | R31, R37–R39, R51.                                                                                                               |
+| Unknown data               | Superseded by §19.1: undeclared properties follow the schema's `additionalProperties` at every depth (`false` diagnoses them; `true` or a schema preserves them); undeclared components follow `unknownComponents` (`reject` or opaque `preserve`).                                                                                                                                                                                                                         | C11, MR05, MR08.                                                                                                                 |
+| Provider profiles          | Superseded by §19.6: `src/core/provider-profiles.ts` holds dated, sourced profiles whose budgets are labelled `documented` or `internal`; live checks are the opt-in `bun run probe:live`.                                                                                                                                                                                                                                                                                  | S01/S02/S05, MR16, MR18.                                                                                                         |
+| Recursive/projected export | Superseded by §19.6: `exportComponentProperties` and `exportDocument` (`nativeTree` or typed `rowProjection`), paired `encodeProviderOutput`/`decodeProviderOutput`.                                                                                                                                                                                                                                                                                                        | S04/S06/S07, MR14–MR17.                                                                                                          |
+| HTML envelope              | `src/adapters/browser.ts`: the tagged source is embedded as an escaped `JSON.stringify` string inside `<script type="application/json" id="doc-payload">`, with `</` replaced by `<\/` to prevent premature termination/script injection; extraction is plain string scanning (no DOMParser). Verified by an actual browser load (see delivery notes) as well as C12/Q01.                                                                                                   | C12, Q01 (real browser + Bun + Node + a Node worker).                                                                            |
+| Region contract            | A component with `regionOwner` owns its subtree for that string property; `RestrictedAuthority` checks touched nodes and positional lists against the actor's view at admission, runs trusted actions, and delivers per-participant events (§18.13, §19.4).                                                                                                                                                                                                                 | V01–V07, MR31.                                                                                                                   |
+| Packaging/license          | Owner selected Apache-2.0 (2026-09-26): `LICENSE` added, `"license": "Apache-2.0"`, public GitHub repository `AnimaticML/ml-collab-codec`. `package.json` stays `"private": true` so nothing is published to npm without a separate release decision. `.bun-version`/`packageManager` were lowered from `1.3.3` to the installed `1.2.5` (the specified version was unavailable in this environment); this is a reproducibility/tooling correction, not a product decision. | —                                                                                                                                |
 
 ### 17.2. Known limitations (reported honestly, not silently narrowed)
 
-- **Diff is correctness-first, not minimal.** `diffToChanges` aligns children by
-  identity/shape, moves persisted ids that reappear elsewhere, and otherwise replaces
-  a child list; text uses a common-prefix/suffix splice. No move detection for
-  anonymous content. Arrays are replaced as whole values by diff (the editable-array
-  primitives are for authored edits).
-- **Provider capability data is a documented, dated, static table**, not live-reverified
-  (no network use in this environment; SPEC §12.3). No live provider probe exists, so
-  none is reported as passed or skipped.
-- **Nested-object schema properties** validate declared nested keys but do not flag
-  undeclared nested keys as `unknownProperty` the way top-level properties do.
-- **Root identity:** the operational table stores the root under `$root`; a persisted
-  id on the document root itself is not carried through `toTable`/`fromTable`.
-- The v3-specific limitations are listed in §18.15; storage and measured performance in §18.14.
+The v1 limitations recorded here earlier (coarse diff, placeholder provider data, nested
+unknown keys, lost root identity) were repaired by the remediation (§19). Current limits
+are listed in §19.8 and in `docs/verification.md`.
 
 ## 18. OT revision v3: selected control profile and contracts
 
@@ -797,7 +789,7 @@ wrap-plus-replace inside the wrapper).
 
 `delta` applies only to JSON safe integers (current value, delta, and result); a
 missing or fractional value, a zero/non-integer delta, or an overflow is rejected
-(`numericProfile` or a decode error), never rounded. With `schemaInvariants`, deltas
+(`numericProfile` or a decode error), never rounded. With `schemaValidator`, deltas
 are accepted only on fields declared `additive`. Consecutive deltas compose when the
 sum stays safe; collaborative undo of a delta is the negated delta, preserving other
 additions.
@@ -904,6 +896,7 @@ without mutating C, or returns `contextUnavailable` / `conflict`.
   ledger (receipts, per-replica highest/expiry, group owners). `importCheckpoint` /
   `restoreAuthority(bundle, tail)` fail closed on unknown formats or schema versions
   and replay tail decision records exactly once (by receipt identity and revision).
+  Since §19.2 the default retains no transitions and import is strict and bounded.
 - Horizons are separate: `pruneTransitionsThrough` (late-transform and archival
   replay), `expireReceiptsThrough` (deduplication; expired ids answer `resync`), the
   client's `undoLimit` (handles live in the client session, already mapped to its
@@ -913,6 +906,7 @@ without mutating C, or returns `contextUnavailable` / `conflict`.
   writer via compare-and-commit on the log position plus an owner generation that
   fences former owners; a losing append reloads checkpoint + tail and re-evaluates;
   checkpoint installation is stage → publish → prune, each step safe to interrupt.
+  The port is asynchronous since §19.2.
   Moving a history to a new host keeps its epoch, origins, receipts, and handles.
 
 ### 18.12. Deployment boundary and future vector profile
@@ -934,9 +928,10 @@ is refused.
 refuses positional edits of child lists that contain another region's children. Trusted
 actions build their changes from current state at commit (`submitAction`) and are
 deduplicated by request id. `eventsFor(principal)` returns per-participant transitions
-synthesized as a diff between the participant's projections before and after (so no
-removed values, inverse payloads, or undo links from other regions travel), with
-metadata only for the author and receipts only for the requester. `exportFor` is an
+forwarded as the original records when the change stays within regions the participant
+sees before and after, and otherwise synthesized as a diff between the participant's
+projections (so no removed values, inverse payloads, or undo links from other regions
+travel), with metadata only for the author and receipts only for the requester. `exportFor` is an
 explicitly partial participant export.
 
 ### 18.14. Storage and measured performance
@@ -951,12 +946,9 @@ lookups in JavaScriptCore. Table iteration order carries no meaning (document or
 `children`). Recovery replays pending work against this structure, so it is cheap too.
 
 `bun run bench` measures Word-like documents (~20 paragraphs per page, inline emphasis,
-a table every ~3 pages, flat body). On the development machine (Bun 1.2.5), 30–500
-pages (3.4k–57k rows): a keystroke costs 0.03–0.2 ms on the client and ~0.1 ms at the
-authority; inserting a paragraph into a 10k-paragraph body ~0.2 ms; recovery after a
-rejection with 20 pending edits ~2 ms. Whole-document operations scale with size: at
-500 pages, parse ~125 ms, `toTable` ~57 ms, serialize ~17 ms, and a whole-document
-agent proposal diff ~60 ms. Timings are machine-dependent evidence, not a gate.
+a table every ~3 pages) with schema validation, history, and copy-on-acquisition on;
+`reports/benchmarks.md` records medians and p95s with the environment. Timings are
+machine-dependent evidence, not a gate.
 
 ### 18.15. Superseded behavior, public API changes, and v3 limitations
 
@@ -964,7 +956,8 @@ Superseded and removed: `Op`, `applyOp`, `applyBatch`, `applyOpsSequential`,
 `transformOp`, value-search `removeArrayItem`, fractional `keyBetween`/`orderKey`,
 the old `Transaction`/`Receipt`/`Client`/`Authority` APIs, `ResyncRequiredError`,
 `diffAgainstTable`, address `shiftAddress`/`resolveOwner`/`resolveContentItem`, and
-the P06 "undo unsupported" assertion. New public API: see `src/index.ts` and README.
+the P06 "undo unsupported" assertion, and (§19) `minimalSplice`, `schemaInvariants`,
+`rootMode`, and `CheckpointError`. New public API: see `src/index.ts` and `docs/`.
 
 Limitations of this implementation, not silently narrowed:
 
@@ -981,5 +974,96 @@ Limitations of this implementation, not silently narrowed:
 - Runtime evidence: Node, Bun, and a Node worker thread are exercised automatically
   (Q01); a real browser (Chromium via `tests/fixtures/browser-check.html`) was run
   manually once in this session and is not part of CI.
-- Diffs used for participant events are whole-list replacements when list shapes
-  differ, so participant clients may take the recovery path for projected events.
+- Participant events for reveals and hides are projection diffs; newly revealed anonymous
+  content receives participant-local handles.
+
+## 19. Remediation (2026-09-27): repaired contracts
+
+This section records the decisions for `ML_COLLAB_REMEDIATION.md` and its acceptance
+families MR01–MR44. Consumer-facing detail lives in `docs/`.
+
+### 19.1. Schema contract and validation
+
+- Schemas are JSON Schema 2020-12 manifests (`defineDocumentSchema`) with local `$defs`
+  (recursion allowed) and the annotations `x-additive`, `x-reference`, and `x-encoding`.
+  `@cfworker/json-schema` (the only runtime dependency) evaluates assertions; unsupported
+  keywords, remote references, other dialects, invalid defaults, and excessive limits are
+  registration errors. The legacy compact profile is an import format (`migrateLegacySchema`).
+- One recursive effective-value normalization serves every entry point (parse, JSON import,
+  standalone validation, provider decode, proposals via the authority, checkpoints and
+  bootstraps). Unknown keys follow `additionalProperties` at every depth. Structural and
+  assertion diagnostics are both reported, each at the exact member path.
+- `x-reference: "definition"` values are unique keys: a duplicate is `duplicateId`.
+- The schema-backed authority validates every final candidate incrementally; a seeded
+  differential test holds it equal to full validation (MR03).
+
+### 19.2. Codec, identity, snapshots, and hosting
+
+- Printing is lossless for every accepted value (extra and opaque props of every JSON kind)
+  and refuses values JSON cannot carry. A document has exactly one root; multi-root and
+  fragment APIs return every root or item. `$root` keeps the document's persistent id.
+- Checkpoints retain no transitions by default and are imported strictly (rows, root,
+  links, cycles, depth, schema validity, contiguous and invertible retained transitions,
+  ledger, decision tail); failures construct nothing (`SnapshotError`).
+- Join: a bootstrap is state (handles preserved, scope recorded), never a log; `beginJoin`
+  subscribes before capturing; `joinClient` integrates the tail once, restores a session
+  in its own context (reconstructing it from self-contained records), or reports history
+  `unavailable` with retained intent. Sessions carry actor and schema and restore only for
+  that actor (MR25–MR33).
+- `DurableStore` is asynchronous; `AuthorityHost` serializes work, installs only after a
+  committed append, reloads after stale or unknown outcomes, fences former owners at every
+  step, and never publishes an older checkpoint over a newer one (MR39–MR40).
+
+### 19.3. Diff
+
+`diffToChanges` retags same-id nodes (`setTag`), diffs props per nested field and arrays
+by positional splice, aligns child lists by identity keys with an LCS (a 4-million-cell
+budget; beyond it the unmatched middle is replaced while persisted nodes are still moved),
+moves persisted descendants out of removed wrappers, and diffs text into separate hunks
+(`textHunks`). A differing root id is refused (MR11–MR13).
+
+### 19.4. Ownership and runtime
+
+Acquisition copies inputs; borrowed views are deeply `readonly` in the types (rows are
+frozen, nested props and child arrays are not); `editableCopy` gives free-edit copies;
+sent envelopes are deeply frozen. Deep runtime freezing is not provided (MR19–MR21).
+Async derivations propagate completion to dependents with generation checks; dependency
+invalidation and projection re-resolution use reverse indexes; restricted events forward
+original records when visibility is unchanged (MR22–MR24).
+
+### 19.5. OT verification
+
+The pair matrix covers all 169 ordered kind pairs at boundary geometries in both origin
+precedences against an independent oracle; generated sweeps classify every outcome;
+simulated histories include validators, checkpoints, pruning, joins, and restarts; 15
+controlled faults in the real source must each be killed (MR34–MR38). An edit addressed to
+a run absorbed by a concurrent merge (text edits, a split, or a further merge) follows its
+text into the surviving run; identical retags are rejected at decode.
+
+### 19.6. Providers
+
+Profiles are dated with sources, and every budget (depth, properties, union variants) is
+labelled `documented` or `internal`. Exports report what the emitted schema enforces, what
+is local-only, and the measured size (nullable type arrays count toward depth). Decoding
+applies the emitted schema, then the full local contract. Live probes are opt-in and never
+print credentials (MR14–MR18).
+
+### 19.7. Distribution and delivery
+
+A pinned commit is consumed by clone, frozen install, build, and a path dependency; this
+is tested from a clean clone (MR41). `engines` states the tested runtimes (Node ≥ 20.11,
+Bun ≥ 1.2.5). Guides in `docs/` contain executed programs (MR42); benchmarks record medians
+and p95s with validation and history on (MR43); `reports/` holds the evidence (MR44).
+
+### 19.8. Current limitations
+
+- One authority per document; no vector-clock or multi-writer profile.
+- Anonymous siblings have positional identity in diffs; very long child lists fall back to
+  coarse middle replacement.
+- Revealed anonymous content in restricted events receives participant-local handles.
+- Provider profiles are dated documentation evidence; the opt-in live probes have not been
+  run in this repository (no credentials were used).
+- Nested props and child arrays are not frozen at runtime; mutation through casts is outside
+  the contract.
+- Parse, print, `toTable`, full validation, and whole-document proposals are linear scans;
+  a keystroke inside a very long text run is linear in that run.

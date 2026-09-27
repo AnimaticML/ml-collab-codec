@@ -104,9 +104,10 @@ commands as a shortcut to a clean report.
 
 ## Acceptance test layout
 
-`ACCEPTANCE.md` lists 60 baseline IDs and the 54 revision families R01–R54. Each ID
-has at least one real `test("C01 ...", () => { ... })`-style case using its literal
-ID prefix; the inventory guard recognizes both. Keep the IDs. More tests for one ID
+`ACCEPTANCE.md` lists 60 baseline IDs, the 54 revision families R01–R54, and the
+remediation families MR01–MR44 (`ML_COLLAB_REMEDIATION_ACCEPTANCE.md`). Each ID has at
+least one real `test("C01 ...", () => { ... })`-style case using its literal ID prefix;
+the inventory guard recognizes all three. Keep the IDs. More tests for one ID
 are welcome. P06 now requires working collaborative undo.
 Use loops/parameterization inside that named case when appropriate. Add new scenarios
 to ACCEPTANCE before assigning new baseline IDs.
@@ -136,6 +137,10 @@ F. Runnable examples, actual runtime/package checks, hardening, and cleanup.
 G. OT revision v3 (done; see SPEC §18): reversible records, identity/context/origin
 contract, publication boundary, runtime adapters, grouping/coalescing, collaborative
 undo/redo, anchors/proposals, checkpoints/host contract, and R01–R54 evidence.
+H. Remediation (done; see SPEC §19): standard JSON Schema contract, lossless codec,
+identity-aware diff, honest provider exports, snapshot join and session restore, strict
+checkpoints, async host, async derived propagation, pair-matrix/generator/simulation/
+fault-injection OT evidence, pinned-Git consumption, and executed consumer docs.
 
 These are milestones, not permission to stop at A or B. Work through required scope.
 Steps may overlap where dependencies make that more efficient. Do not finish with

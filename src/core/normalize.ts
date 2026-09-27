@@ -164,12 +164,16 @@ export function normalizeComponentProps(
   if (!isObject(raw))
     return { value: {}, diagnostics: [diag("invalidValue", path, "props must be an object")] };
   const value = normalizeObject(component.props, raw, path, 0, walk);
-  if (walk.diagnostics.length > 0) return { value, diagnostics: walk.diagnostics };
   const standard = profile.standardProps[tag];
-  return {
-    value,
-    diagnostics: standard === undefined ? [] : standardDiagnostics(standard, value, path),
-  };
+  const assertions = standard === undefined ? [] : standardDiagnostics(standard, value, path);
+  // A value dropped for a structural problem is already diagnosed at its path; the remaining
+  // assertion failures elsewhere are reported too, so one error never hides another.
+  const covered = (d: Diagnostic): boolean =>
+    walk.diagnostics.some(
+      (w) =>
+        d.path === w.path || d.path.startsWith(`${w.path}.`) || d.path.startsWith(`${w.path}[`),
+    );
+  return { value, diagnostics: [...walk.diagnostics, ...assertions.filter((d) => !covered(d))] };
 }
 
 export function deepEqual(a: JsonValue, b: JsonValue): boolean {

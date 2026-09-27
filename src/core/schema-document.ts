@@ -138,6 +138,7 @@ export function defineDocumentSchema(definition: DocumentSchemaDefinition): Sche
     const props = isRecord(rawComponent) ? rawComponent["props"] : undefined;
     standardProps[tag] = withDefinitions((isRecord(props) ? props : {}) as JsonObject, definitions);
   }
+  compiler.checkEncodings();
   compiler.checkDefaults(definitions);
   const diagnostics = [...out, ...compiler.diagnostics];
   if (diagnostics.length > 0) throw new DiagnosticError(diagnostics);

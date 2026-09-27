@@ -222,6 +222,10 @@ named test; the file column names where the substantive assertions live.
 | MR38 | Negative controls and fault sensitivity                | `mr-mutation.test.ts`     |
 | MR39 | Delayed durable append                                 | `mr-host.test.ts`         |
 | MR40 | Async checkpoint cut and ownership                     | `mr-host.test.ts`         |
+| MR41 | Clean pinned-Git consumer                              | `mr-distribution.test.ts` |
+| MR42 | Runnable consumer documentation                        | `mr-delivery.test.ts`     |
+| MR43 | Performance with the shipping guarantees               | `mr-delivery.test.ts`     |
+| MR44 | Full regression and evidence delivery                  | `mr-delivery.test.ts`     |
 
 ## Required expansion beyond the baseline
 

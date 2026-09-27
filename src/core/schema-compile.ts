@@ -17,6 +17,8 @@ export class SchemaCompiler {
   readonly diagnostics: Diagnostic[] = [];
   private readonly placeholders = new Map<string, Mutable>();
   private readonly defaults: { raw: Raw; path: string }[] = [];
+  /** Comma encodings, checked once every `$ref` target is compiled. */
+  private readonly encodings: { raw: Raw; path: string; out: Mutable }[] = [];
   private nodes = 0;
 
   constructor(private readonly defs: Raw) {
@@ -171,19 +173,24 @@ export class SchemaCompiler {
   }
 
   private encoding(raw: Raw, path: string, out: Mutable): void {
-    if (raw["x-encoding"] !== "comma") return;
-    const items = raw["items"];
-    const itemType = isRecord(items) ? items["type"] : undefined;
-    if (raw["type"] === "array" && typeof itemType === "string" && PRIMITIVE_ITEMS.has(itemType))
-      out["commaShorthand"] = true;
-    else
-      this.diagnostics.push(
-        diag(
-          "invalidSchema",
-          `${path}.x-encoding`,
-          "comma encoding requires an array of primitive items",
-        ),
-      );
+    if (raw["x-encoding"] === "comma") this.encodings.push({ raw, path, out });
+  }
+
+  /** The comma shorthand needs an array whose (resolved) items are primitive. */
+  checkEncodings(): void {
+    for (const { raw, path, out } of this.encodings) {
+      const itemType = (out["items"] as PropertySchema | undefined)?.type;
+      if (raw["type"] === "array" && itemType !== undefined && PRIMITIVE_ITEMS.has(itemType))
+        out["commaShorthand"] = true;
+      else
+        this.diagnostics.push(
+          diag(
+            "invalidSchema",
+            `${path}.x-encoding`,
+            "comma encoding requires an array of primitive items",
+          ),
+        );
+    }
   }
 
   /** Defaults must satisfy their complete declared constraints. */

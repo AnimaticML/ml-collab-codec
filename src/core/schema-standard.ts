@@ -76,7 +76,10 @@ export function standardDiagnostics(
   for (const error of result.errors) {
     if (!ASSERTIONS.has(error.keyword)) continue;
     if (/\/(oneOf|anyOf)\/\d+\//.test(error.keywordLocation)) continue;
-    const at = pointerToPath(path, error.instanceLocation);
+    const parent = pointerToPath(path, error.instanceLocation);
+    // A missing required member is reported at the member's own path.
+    const member = error.keyword === "required" ? /"([^"]+)"/.exec(error.error)?.[1] : undefined;
+    const at = member === undefined ? parent : `${parent}.${member}`;
     const key = `${at}|${error.keyword}`;
     if (seen.has(key)) continue;
     seen.add(key);
