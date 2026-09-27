@@ -15,6 +15,5 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
-      # The implementing agent must generate and commit bun.lock first.
       - run: bun install --frozen-lockfile
       - run: bun run check
