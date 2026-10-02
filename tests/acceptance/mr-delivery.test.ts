@@ -88,7 +88,7 @@ describe("MR42–MR44 consumer documentation, performance evidence, and delivery
   test("MR44 Evidence delivery is complete and consistent", () => {
     // Every remediation family has a row (and the inventory guard requires a named test).
     const acceptance = read("ACCEPTANCE.md");
-    for (let i = 1; i <= 44; i += 1) {
+    for (let i = 1; i <= 46; i += 1) {
       const id = `MR${String(i).padStart(2, "0")}`;
       expect({ id, listed: new RegExp(`^\\| ${id} \\|`, "m").test(acceptance) }).toEqual({
         id,

@@ -20,7 +20,7 @@ counterexamples stay pinned as regressions with their seed and explanation.
 ## Test families
 
 `ACCEPTANCE.md` maps every scenario ID (baseline C/S/I/O/P/V/Q, the OT revision R01–R54, and
-the remediation MR01–MR44) to the files with its assertions. Highlights:
+the remediation MR01–MR44, and the causal own-undo repair MR45–MR46) to the files with its assertions. Highlights:
 
 - **Operation algebra**: every ordered pair of the 13 primitive kinds at boundary geometries,
   in both origin precedences, checked against an independent oracle (a spec-derived

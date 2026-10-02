@@ -36,6 +36,62 @@ work, so other people's edits survive. Results are explicit: `requested`, `defer
 original is still in flight), `cancelledLocally` (the work was never sent),
 `noRemainingEffect`, `conflict` (a later incompatible change), or `unavailable`.
 
+Later **own** groups are causal, not concurrent. Creating a text run and then typing into it
+in a separate group, or writing one field three times in three groups, temporarily makes the
+earlier handle unusable (deleting the run would remove the later text; restoring the first
+value would overwrite the later one). Once your later groups are undone, the earlier group
+is undoable again: the history verifies that each accepted undo/redo exactly cancels the
+effects it reverses and recomputes the earlier handle without them. Another actor's work is
+never cancelled this way, so a collaborator's text inside your run, or their write to your
+field, still makes the undo a `conflict` rather than deleting or overwriting it. A handle
+retains at most 1000 later transitions for this; past that, a conflict stays final.
+
+```ts
+import assert from "node:assert/strict";
+import { Authority, Client, createAllocator, SequenceAllocator, toTable } from "ml-collab-codec";
+
+const model = {
+  schemaId: "example.names",
+  schemaVersion: "1",
+  root: { id: "doc", tag: "doc", props: {}, content: [{ id: "v", tag: "var", props: {} }] },
+};
+const authority = Authority.create("doc-2", "epoch-1", toTable(model, createAllocator()));
+const client = new Client({
+  documentId: "doc-2",
+  historyEpoch: "epoch-1",
+  table: authority.getTable(),
+  revision: 0,
+  allocator: SequenceAllocator.ephemeral("replica-a"),
+  actor: "alice",
+});
+const sync = (): void => {
+  const request = client.nextRequest();
+  if (request === undefined) return;
+  const decision = authority.submit(request, { actor: "alice" });
+  if (decision.kind !== "decided") throw new Error(decision.reason);
+  client.receive([...(decision.transition ? [decision.transition] : []), decision.receipt]);
+};
+const name = () => authority.getTable().get("v")?.props["name"];
+
+for (const value of ["First", "Second", "Third"]) {
+  client.transact((b) => b.set("v", "name", value));
+  client.closeGroup();
+  sync();
+}
+const undone = [];
+for (let step = 0; step < 3; step += 1) {
+  assert.equal(client.undo().status, "requested");
+  sync();
+  undone.push(name());
+}
+assert.deepEqual(undone, ["Second", "First", undefined]); // the field was absent at first
+for (let step = 0; step < 3; step += 1) {
+  assert.equal(client.redo().status, "requested");
+  sync();
+}
+assert.equal(name(), "Third");
+```
+
 ## Joining from a snapshot
 
 A **bootstrap** is state at revision V: the operational rows (internal handles preserved),

@@ -1,16 +1,21 @@
 import type { Change } from "./change.ts";
 import { invertChanges } from "./change.ts";
+import type { CleanHandle, LogEntry, Recovery } from "./history-recovery.ts";
+import { cancelPairs, degraded, mapChanges, mapOver, RECOVERY_LIMIT } from "./history-recovery.ts";
 import type { TransitionEvent } from "./protocol.ts";
-import { isConflict, transformPair } from "./transform.ts";
 
 /**
  * A current-context cancellation (or redo) handle: complete reversible
  * primitives already mapped to the client's confirmed revision, plus how
  * many original contributions are no longer effective. A handle that met a
  * later incompatible change becomes a conflict and is never applied blindly.
+ * A handle degraded by a transition (conflict or lost contribution) keeps a
+ * `recovery` while it can still be restored by an own undo/redo that
+ * cancels that transition (v3 §8, SPEC §20).
  */
-export type Handle =
-  { readonly changes: readonly Change[]; readonly dropped: number } | { readonly conflict: string };
+export type Handle = (CleanHandle | { readonly conflict: string }) & {
+  readonly recovery?: Recovery;
+};
 
 export type GroupState = "active" | "undone" | "spent";
 
@@ -36,19 +41,54 @@ export interface HistoryExport {
 
 const EMPTY: Handle = { changes: [], dropped: 0 };
 
-function mapHandle(handle: Handle | undefined, accepted: readonly Change[]): Handle | undefined {
-  if (handle === undefined || "conflict" in handle) return handle;
-  let incoming = accepted;
-  const mapped: Change[] = [];
-  let dropped = handle.dropped;
-  for (const change of handle.changes) {
-    const pair = transformPair([change], incoming);
-    if (isConflict(pair)) return { conflict: pair.detail };
-    if (pair.a.length === 0) dropped += 1;
-    mapped.push(...pair.a);
-    incoming = pair.b;
+type Mapped = CleanHandle | { readonly conflict: string };
+
+/** Map a handle that keeps no recovery; start one when the transition degrades it. */
+function step(handle: Mapped, entry: LogEntry): Handle {
+  if ("conflict" in handle) return { conflict: handle.conflict };
+  const mapped = mapChanges(handle, entry.changes);
+  const next: Mapped =
+    "conflict" in mapped
+      ? { conflict: mapped.conflict }
+      : { changes: mapped.changes, dropped: mapped.dropped };
+  if (!degraded(handle, next)) return next;
+  const base = { changes: handle.changes, dropped: handle.dropped };
+  return { ...next, recovery: { base, since: [entry] } };
+}
+
+/**
+ * Fold one accepted transition into a handle. A degraded handle also logs
+ * the transition; when it is an own undo/redo that cancels earlier own
+ * effects, the handle is recomputed from its last clean form.
+ */
+function advance(handle: Handle | undefined, entry: LogEntry): Handle | undefined {
+  if (handle === undefined) return undefined;
+  const { recovery, ...current } = handle;
+  if (recovery === undefined) return step(current, entry);
+  const reduced = cancelPairs([...recovery.since, entry]);
+  if (reduced !== undefined) {
+    const next = mapOver(recovery.base, reduced);
+    return degraded(recovery.base, next)
+      ? { ...next, recovery: { base: recovery.base, since: reduced } }
+      : next;
   }
-  return { changes: mapped, dropped };
+  const { recovery: _fresh, ...next } = step(current, entry);
+  const since = [...recovery.since, entry];
+  return since.length > RECOVERY_LIMIT ? next : { ...next, recovery: { ...recovery, since } };
+}
+
+function tagOf(transition: TransitionEvent, own: boolean): LogEntry["own"] {
+  const meta = transition.meta;
+  if (!own) return undefined;
+  if (meta.undoOf !== undefined) return { group: meta.undoOf, kind: "undo" };
+  if (meta.redoOf !== undefined) return { group: meta.redoOf, kind: "redo" };
+  return meta.group === undefined ? undefined : { group: meta.group, kind: "do" };
+}
+
+/** A new own member's inverse runs first; recovery cannot span the group's own growth. */
+function prepend(inverse: readonly Change[], handle: Handle): Handle {
+  if ("conflict" in handle) return { conflict: handle.conflict };
+  return { changes: [...inverse, ...handle.changes], dropped: handle.dropped };
 }
 
 /**
@@ -142,11 +182,16 @@ export class UndoHistory {
     this.revision = transition.revision;
     const meta = transition.meta;
     const inverse = invertChanges(transition.changes);
-    const target = own ? (meta.undoOf ?? meta.redoOf ?? meta.group) : undefined;
+    const tag = tagOf(transition, own);
+    const entry: LogEntry =
+      tag === undefined
+        ? { changes: transition.changes }
+        : { changes: transition.changes, own: tag };
+    const target = tag?.group;
     for (const group of this.groups.values()) {
       if (group.id === target) continue;
-      const undo = mapHandle(group.undo, transition.changes) ?? EMPTY;
-      const redo = mapHandle(group.redo, transition.changes);
+      const undo = advance(group.undo, entry) ?? EMPTY;
+      const redo = advance(group.redo, entry);
       this.groups.set(group.id, { ...group, undo, ...(redo === undefined ? {} : { redo }) });
     }
     const group = target === undefined ? undefined : this.groups.get(target);
@@ -168,11 +213,7 @@ export class UndoHistory {
       });
       this.redoStack = this.redoStack.filter((id) => id !== group.id);
     } else {
-      const undo =
-        "conflict" in group.undo
-          ? group.undo
-          : { changes: [...inverse, ...group.undo.changes], dropped: group.undo.dropped };
-      this.groups.set(group.id, { ...group, undo });
+      this.groups.set(group.id, { ...group, undo: prepend(inverse, group.undo) });
     }
   }
 

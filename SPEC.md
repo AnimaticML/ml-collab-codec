@@ -867,7 +867,8 @@ indexed lazy derivations over prop/text/children/external inputs, injected
   are never rewritten. `noCoalescing` keeps every sample (trajectory recording).
 - `UndoHistory` keeps, per own group, a current-context undo handle: an own member's
   inverse is prepended, every other confirmed transition rebases the handle. A handle
-  that meets an incompatible later change becomes a conflict. `undo()`/`undo(group)`
+  that meets an incompatible later change becomes a conflict; when that change was an
+  own group's, undoing that group restores the handle (§20). `undo()`/`undo(group)`
   cancels unsent members locally, defers while a member is in flight (and sends the
   compensation once the original's receipt is known), otherwise submits a new request
   `meta.undoOf = group` built from the handle rebased over pending work. The authority
@@ -1067,3 +1068,42 @@ and p95s with validation and history on (MR43); `reports/` holds the evidence (M
   the contract.
 - Parse, print, `toTable`, full validation, and whole-document proposals are linear scans;
   a keystroke inside a very long text run is linear in that run.
+
+## 20. Causal own-undo repair (2026-10-02)
+
+Reported by the Docong integration against `2e5e75c` (acceptance MR45–MR46): an earlier
+own group's handle was mapped over a later own group's transition, became a conflict (a
+node deletion over a text insertion into that node; a field restore over a later write to
+that field) or lost part of its content, and stayed that way after the later group was
+undone. Own groups accepted in sequence are causally ordered; the later one was authored
+on top of the earlier one. This was a history defect, not a transform defect: the
+transform correctly refuses to delete or overwrite content it does not own.
+
+- **Recovery log.** When a transition degrades a handle — a conflict, a dropped
+  contribution, or a primitive whose content (not only its positions) changed — the
+  handle keeps `recovery = { base, since }`: its last clean form and the accepted
+  transitions after it, own ones tagged with their group and kind (`do`, `undo`, `redo`).
+  Clean handles keep nothing extra.
+- **Cancellation.** When an own undo of group H arrives, it is cancelled against H's
+  effects in `since`, latest first, stopping at H's previous undo; an own redo is
+  cancelled against H's latest undo. Removing an effect C carries `inverse(C)` forward
+  through the later entries, which come out without C (by TP1,
+  `C · X₁…Xₙ · inverse(C)′ ≡ X₁′…Xₙ′`). Each step is verified: the accepted undo/redo
+  must begin with exactly that carried inverse (canonical comparison); otherwise
+  cancellation stops. An unmatched remainder (effects absorbed before the base) stays as
+  an entry. After a cancellation the handle is recomputed by mapping `base` over the
+  reduced log; if the result is clean, the recovery is discarded.
+- **Ownership is preserved.** Only this replica's accepted undo/redo transitions linked
+  to a group cancel anything. Remote transitions — including a remote write that restores
+  an old value (R18) — stay in the log, so a collaborator's text inside a created run, or
+  a collaborator's write to the field, still yields a conflict. Undo of an earlier group
+  while a later dependent own group is still active also remains a conflict; LIFO order
+  through the later group is the supported path.
+- **Bounds.** A recovering handle retains at most `RECOVERY_LIMIT` (1000) transitions;
+  beyond that the recovery is dropped and a conflict is final. If a degraded group gains
+  a new own member (an interleaved explicit group), its recovery is dropped as before.
+  The recovery is part of `HistoryExport`, so exported sessions keep it (the `Handle`
+  type gained an optional `recovery` field; existing sessions without it load as before).
+- **Grouping is separate.** Typing policy and explicit groups are unchanged. The repair
+  makes undo work across any boundary (default policy, pause, caret movement, explicit
+  segments); an application may still choose larger explicit groups for its own UX.

@@ -227,6 +227,31 @@ named test; the file column names where the substantive assertions live.
 | MR43 | Performance with the shipping guarantees               | `mr-delivery.test.ts`     |
 | MR44 | Full regression and evidence delivery                  | `mr-delivery.test.ts`     |
 
+## Causal own-undo repair (MR45–MR46)
+
+Docong reported (against `2e5e75c`) that an earlier own group became permanently
+conflicted once a later own group edited what it created or wrote. Own groups accepted
+in sequence are causally ordered, not concurrent. After the later own groups are undone,
+each earlier group must be undoable whenever its effect can be cancelled in the resulting
+state; redo must rebuild the authored state in order. Another actor's contribution is
+never cancelled this way: it is preserved or reported as a justified conflict.
+
+| ID   | Family                                                  | Primary tests            |
+| ---- | ------------------------------------------------------- | ------------------------ |
+| MR45 | Created text, runs and spans edited by later own groups | `mr-causal-undo.test.ts` |
+| MR46 | Sequential own writes to one shared field               | `mr-causal-undo.test.ts` |
+
+MR45 covers direct node creation followed by own text insertion, plain/bold/plain typing
+through `diffToChanges` with the default typing policy and explicit groups, pause and
+caret-movement boundaries inside a new run or span, child edits of a new anonymous span,
+insert/delete/replace bursts with Unicode, empty runs and a removed span, fresh editing
+after undo (redo branch cleared), unrelated remote edits, a collaborator's text inside the
+created run (justified conflict, never deleted), session export/restore of the recovery
+state, and the pre-existing-run control. MR46 covers an absent and a pre-existing field,
+name/description/typed default values (`0`, `false`, empty string kept distinct from
+absence) with node identity unchanged, repeated undo/redo cycles, fresh work after
+partial redo, and a collaborator's intervening write staying protected.
+
 ## Required expansion beyond the baseline
 
 These scenarios name families, not one happy-path assertion each. Expand them into

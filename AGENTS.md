@@ -105,7 +105,8 @@ commands as a shortcut to a clean report.
 ## Acceptance test layout
 
 `ACCEPTANCE.md` lists 60 baseline IDs, the 54 revision families R01–R54, and the
-remediation families MR01–MR44 (`ML_COLLAB_REMEDIATION_ACCEPTANCE.md`). Each ID has at
+remediation families MR01–MR44 (`ML_COLLAB_REMEDIATION_ACCEPTANCE.md`) plus the
+causal own-undo repair families MR45–MR46. Each ID has at
 least one real `test("C01 ...", () => { ... })`-style case using its literal ID prefix;
 the inventory guard recognizes all three. Keep the IDs. More tests for one ID
 are welcome. P06 now requires working collaborative undo.
