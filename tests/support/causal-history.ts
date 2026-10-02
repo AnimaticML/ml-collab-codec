@@ -7,6 +7,7 @@ import {
   typingHistoryPolicy,
   type ChangeBuilder,
   type Client,
+  type ClientOptions,
   type ContentItem,
   type DocumentModel,
   type JsonValue,
@@ -27,7 +28,11 @@ export class CausalProbe {
   readonly other: Client;
   private time = 0;
 
-  constructor(paragraphs: readonly (readonly ContentItem[])[] = [["Начало "]], props = {}) {
+  constructor(
+    paragraphs: readonly (readonly ContentItem[])[] = [["Начало "]],
+    props = {},
+    options: Partial<ClientOptions> = {},
+  ) {
     const model: DocumentModel = {
       schemaId: SCHEMA,
       schemaVersion: "1",
@@ -47,6 +52,7 @@ export class CausalProbe {
     this.writer = this.room.join("writer", "replica-w", "writer", {
       historyPolicy: typingHistoryPolicy(1000),
       now: () => this.time,
+      ...options,
     });
     this.other = this.room.join("other", "replica-o");
   }

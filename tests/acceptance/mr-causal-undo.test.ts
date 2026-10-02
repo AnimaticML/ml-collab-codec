@@ -216,6 +216,59 @@ describe("MR45 causal own undo across dependent text and subtree groups", () => 
     expect(undone).toEqual([["Начало один"], ["Начало "]]);
   });
 
+  test("MR45 Long typing into a new run recovers with no transition cap", () => {
+    const probe = new CausalProbe();
+    let run = "";
+    probe.transact((b) => {
+      run = b.insertNode("paragraph", 1, "х");
+    });
+    let typed = "х";
+    for (let burst = 0; burst < 3; burst += 1) {
+      probe.advance(1500);
+      for (let index = 0; index < 400; index += 1) {
+        probe.transact((b) => b.textInsert(run, typed.length, "я"));
+        typed += "я";
+      }
+    }
+    // One shared log entry per transition since the run's undo broke, not one per group.
+    const log = probe.writer.exportSession().history.recoveryLog;
+    expect(log?.entries.length).toBe(1200);
+    expect(probe.exhaust("undo")).toEqual([
+      [`Начало ${typed.slice(0, 801)}`],
+      [`Начало ${typed.slice(0, 401)}`],
+      ["Начало х"],
+      ["Начало "],
+    ]);
+    // Only the run's removal stays: redoing the typing groups recovers through it.
+    const kept = probe.writer.exportSession().history.recoveryLog?.entries ?? [];
+    expect(kept.map((entry) => entry.own?.kind)).toEqual(["undo"]);
+    expect(probe.exhaust("redo").at(-1)).toEqual([`Начало ${typed}`]);
+    // The run's undo is broken again by the redone typing: exactly those three redos are kept.
+    const after = probe.writer.exportSession().history.recoveryLog?.entries ?? [];
+    expect(after.map((entry) => entry.own?.kind)).toEqual(["redo", "redo", "redo"]);
+    expect(probe.exhaust("undo").at(-1)).toEqual(["Начало "]);
+  }, 60_000);
+
+  test("MR45 An optional recoveryLimit caps the log; older recovery ends as a conflict", () => {
+    const probe = new CausalProbe([["Начало "]], {}, { recoveryLimit: 3 });
+    let run = "";
+    probe.transact((b) => {
+      run = b.insertNode("paragraph", 1, "х");
+    });
+    probe.advance(1500);
+    [..."вост"].forEach((character, index) =>
+      probe.transact((b) => b.textInsert(run, 1 + index, character)),
+    );
+    expect(probe.writer.exportSession().history.recoveryLog?.entries.length).toBeLessThan(4);
+    expect(probe.restore("undo").status).toBe("requested");
+    expect(probe.restore("undo")).toMatchObject({
+      status: "conflict",
+      reason: "the deletion would remove concurrently edited content",
+    });
+    expect(probe.content()).toEqual(["Начало х"]);
+    expect(() => new CausalProbe([["Начало "]], {}, { recoveryLimit: -1 })).toThrow(RangeError);
+  });
+
   test("MR45 Recovery state survives a session export and restore", () => {
     const probe = new CausalProbe();
     let run = "";

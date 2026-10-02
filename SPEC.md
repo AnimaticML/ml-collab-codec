@@ -1079,13 +1079,22 @@ undone. Own groups accepted in sequence are causally ordered; the later one was 
 on top of the earlier one. This was a history defect, not a transform defect: the
 transform correctly refuses to delete or overwrite content it does not own.
 
+- **Why anything is replayed.** Undo applies a group's inverse, kept incrementally mapped
+  to the current context; normally nothing is recomputed. Mapping is lossy when a later
+  change makes the inverse impossible (deleting a run would delete the text typed into it
+  later): the result is a conflict with no primitives left, so it cannot be "unmapped"
+  when the later group is undone. Recovery therefore keeps the last clean form and
+  re-maps it, once, when an own undo/redo has cancelled the obstruction.
 - **Recovery log.** When a transition degrades a handle — a conflict, a dropped
   contribution, or a primitive whose content (not only its positions) changed — the
-  handle keeps `recovery = { base, since }`: its last clean form and the accepted
-  transitions after it, own ones tagged with their group and kind (`do`, `undo`, `redo`).
-  Clean handles keep nothing extra.
+  handle keeps `recovery = { base, from }`: its last clean form and the revision it was
+  valid at. The accepted transitions are stored once, in the history's shared
+  `RecoveryLog`, own ones tagged with their group and kind (`do`, `undo`, `redo`). Clean
+  handles keep nothing extra. Only an own undo/redo triggers a recomputation, and only
+  for degraded handles; the reduced view after each `from` is computed once per
+  transition and shared.
 - **Cancellation.** When an own undo of group H arrives, it is cancelled against H's
-  effects in `since`, latest first, stopping at H's previous undo; an own redo is
+  effects in the log, latest first, stopping at H's previous undo; an own redo is
   cancelled against H's latest undo. Removing an effect C carries `inverse(C)` forward
   through the later entries, which come out without C (by TP1,
   `C · X₁…Xₙ · inverse(C)′ ≡ X₁′…Xₙ′`). Each step is verified: the accepted undo/redo
@@ -1099,11 +1108,21 @@ transform correctly refuses to delete or overwrite content it does not own.
   a collaborator's write to the field, still yields a conflict. Undo of an earlier group
   while a later dependent own group is still active also remains a conflict; LIFO order
   through the later group is the supported path.
-- **Bounds.** A recovering handle retains at most `RECOVERY_LIMIT` (1000) transitions;
-  beyond that the recovery is dropped and a conflict is final. If a degraded group gains
-  a new own member (an interleaved explicit group), its recovery is dropped as before.
-  The recovery is part of `HistoryExport`, so exported sessions keep it (the `Handle`
-  type gained an optional `recovery` field; existing sessions without it load as before).
+- **Bounds.** There is no fixed transition cap. After every transition the log is trimmed
+  to the oldest `from` among handles that can still be used — an active group's undo or
+  an undone group's redo; spent and evicted groups release theirs — so it is empty
+  whenever nothing is degraded and is otherwise bounded by the retained groups
+  (`undoLimit`, default 100). A host may set `ClientOptions.recoveryLimit` to cap the
+  retained transitions for memory or session size; recoveries older than the cap are
+  dropped and their conflicts become final. If a degraded group gains a new own member
+  (an interleaved explicit group), its recovery is dropped as before. The log and
+  recoveries are part of `HistoryExport` (`recoveryLog`), so exported sessions keep them;
+  sessions without it, or with the earlier per-handle form, load with recovery dropped.
+- **Cost.** Typing cost is unchanged from before the repair (measured: three 500-keystroke
+  bursts after creating a run). Replaying a recovery took about 5 ms in that scenario. A
+  separate pre-existing cost remains: a group's handle keeps one primitive per keystroke,
+  so undoing a long typing group maps every other long handle over a long transition
+  (quadratic in burst length; about 2.3 s for 500-keystroke groups, same as before).
 - **Grouping is separate.** Typing policy and explicit groups are unchanged. The repair
   makes undo work across any boundary (default policy, pause, caret movement, explicit
   segments); an application may still choose larger explicit groups for its own UX.

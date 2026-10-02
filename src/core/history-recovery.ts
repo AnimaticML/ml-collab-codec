@@ -10,26 +10,25 @@ export interface CleanHandle {
 }
 
 /**
- * An accepted transition as a recovering handle records it. `own` tags this
- * replica's transitions that applied (`do`), cancelled (`undo`) or reapplied
- * (`redo`) one of its groups; only those can later be cancelled out.
+ * An accepted transition in the recovery log. `own` tags this replica's
+ * transitions that applied (`do`), cancelled (`undo`) or reapplied (`redo`)
+ * one of its groups; only those can later be cancelled out.
  */
 export interface LogEntry {
+  readonly revision: number;
   readonly changes: readonly Change[];
   readonly own?: { readonly group: string; readonly kind: "do" | "undo" | "redo" };
 }
 
 /**
- * Why a degraded handle may become usable again: the last clean handle and
- * the accepted transitions since, with cancelled own do/undo pairs removed.
+ * How a degraded handle may become usable again: its last clean form,
+ * valid at revision `from`. The accepted transitions after `from` live once
+ * in the history's shared `RecoveryLog`.
  */
 export interface Recovery {
   readonly base: CleanHandle;
-  readonly since: readonly LogEntry[];
+  readonly from: number;
 }
-
-/** Transitions a degraded handle retains before recovery is given up (a conflict stays final). */
-export const RECOVERY_LIMIT = 1000;
 
 const POSITIONS = new Set(["offset", "index", "from", "gap", "fromIndex"]);
 
@@ -39,10 +38,12 @@ const POSITIONS = new Set(["offset", "index", "from", "gap", "fromIndex"]);
  * transform rebuilt counts as changed (conservatively keeping recovery).
  */
 function reshaped(before: Change, after: Change): boolean {
+  if (before === after) return false;
   const a = before as unknown as Record<string, unknown>;
   const b = after as unknown as Record<string, unknown>;
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  return [...keys].some((key) => !POSITIONS.has(key) && a[key] !== b[key]);
+  for (const key in b) if (!POSITIONS.has(key) && a[key] !== b[key]) return true;
+  for (const key in a) if (!(key in b)) return true;
+  return false;
 }
 
 /**
@@ -115,10 +116,17 @@ function exclude(
   return { inverse, after };
 }
 
-function startsWith(changes: readonly Change[], prefix: readonly Change[]): boolean {
+/** Whether `changes` continues at `offset` with exactly `prefix`. */
+function continuesWith(
+  changes: readonly Change[],
+  offset: number,
+  prefix: readonly Change[],
+): boolean {
   return (
-    prefix.length <= changes.length &&
-    prefix.every((change, index) => canonicalJson(change) === canonicalJson(changes[index]))
+    offset + prefix.length <= changes.length &&
+    prefix.every(
+      (change, index) => canonicalJson(change) === canonicalJson(changes[offset + index]),
+    )
   );
 }
 
@@ -140,19 +148,21 @@ function relation(last: LogEntry, entry: LogEntry): "cancels" | "stop" | "skip" 
 export function cancelPairs(entries: readonly LogEntry[]): LogEntry[] | undefined {
   const last = entries[entries.length - 1];
   if (last?.own === undefined || last.own.kind === "do") return undefined;
-  let log = entries.slice(0, -1);
-  let rest = last.changes;
+  const log = entries.slice(0, -1);
+  let matched = 0;
   let cancelled = false;
   for (let index = log.length - 1; index >= 0; index -= 1) {
     const kind = relation(last, log[index] as LogEntry);
     if (kind === "skip") continue;
     const excluded = kind === "cancels" ? exclude(log, index) : undefined;
-    if (excluded === undefined || !startsWith(rest, excluded.inverse)) break;
-    rest = rest.slice(excluded.inverse.length);
-    log = [...log.slice(0, index), ...excluded.after];
+    if (excluded === undefined || !continuesWith(last.changes, matched, excluded.inverse)) break;
+    matched += excluded.inverse.length;
+    log.length = index;
+    for (const entry of excluded.after) log.push(entry);
     cancelled = true;
     if (last.own.kind === "redo") break;
   }
   if (!cancelled) return undefined;
+  const rest = last.changes.slice(matched);
   return rest.length === 0 ? log : [...log, { ...last, changes: rest }];
 }

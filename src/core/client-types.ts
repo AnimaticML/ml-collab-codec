@@ -34,6 +34,14 @@ export interface ClientOptions {
   readonly historyPolicy?: HistoryPolicy;
   readonly coalescing?: CoalescingPolicy;
   readonly undoLimit?: number;
+  /**
+   * Optional cap on accepted transitions kept so that an own group's undo,
+   * broken by a later own group, recovers once that group is undone.
+   * Default: unbounded (the log is trimmed to what retained groups can use,
+   * so `undoLimit` bounds it). A smaller value saves memory and session size;
+   * a recovery older than the cap ends as a final conflict.
+   */
+  readonly recoveryLimit?: number;
   readonly restore?: ClientSession;
   /** The schema interpretation, recorded in exported sessions and checked on restore. */
   readonly schemaRef?: SchemaRef;

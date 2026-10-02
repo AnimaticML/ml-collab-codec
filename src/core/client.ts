@@ -66,8 +66,8 @@ export class Client implements DocumentStore {
     };
     this.history =
       restored === undefined
-        ? new UndoHistory(options.revision, options.undoLimit)
-        : UndoHistory.restore(restored.history, options.undoLimit);
+        ? new UndoHistory(options.revision, options.undoLimit, options.recoveryLimit)
+        : UndoHistory.restore(restored.history, options.undoLimit, options.recoveryLimit);
     this.now = options.now ?? (() => 0);
     this.authoring = new AuthoringState(
       { actor: options.actor, session: options.session ?? options.allocator.replica },

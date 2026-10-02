@@ -43,8 +43,10 @@ value would overwrite the later one). Once your later groups are undone, the ear
 is undoable again: the history verifies that each accepted undo/redo exactly cancels the
 effects it reverses and recomputes the earlier handle without them. Another actor's work is
 never cancelled this way, so a collaborator's text inside your run, or their write to your
-field, still makes the undo a `conflict` rather than deleting or overwriting it. A handle
-retains at most 1000 later transitions for this; past that, a conflict stays final.
+field, still makes the undo a `conflict` rather than deleting or overwriting it. The history
+keeps the needed later transitions once, in a shared log trimmed to what retained groups can
+still use (`undoLimit` bounds it). Set `recoveryLimit` on the client to cap it for memory or
+session size; a recovery older than the cap ends as a final conflict.
 
 ```ts
 import assert from "node:assert/strict";
