@@ -230,9 +230,19 @@ describe("MR45 causal own undo across dependent text and subtree groups", () => 
         typed += "я";
       }
     }
-    // One shared log entry per transition since the run's undo broke, not one per group.
-    const log = probe.writer.exportSession().history.recoveryLog;
-    expect(log?.entries.length).toBe(1200);
+    // Each typing group is stored composed: one log entry and one undo primitive per burst.
+    const history = probe.writer.exportSession().history;
+    expect(
+      history.recoveryLog?.entries.map((entry) =>
+        entry.changes.map((change) =>
+          change.kind === "textInsert" ? [change.offset, change.text] : change.kind,
+        ),
+      ),
+    ).toEqual([1, 401, 801].map((offset) => [[offset, "я".repeat(400)]]));
+    for (const group of history.groups.slice(1))
+      expect(group.undo).toMatchObject({
+        changes: [{ kind: "textDelete", text: "я".repeat(400) }],
+      });
     expect(probe.exhaust("undo")).toEqual([
       [`Начало ${typed.slice(0, 801)}`],
       [`Начало ${typed.slice(0, 401)}`],
@@ -250,23 +260,57 @@ describe("MR45 causal own undo across dependent text and subtree groups", () => 
   }, 60_000);
 
   test("MR45 An optional recoveryLimit caps the log; older recovery ends as a conflict", () => {
-    const probe = new CausalProbe([["Начало "]], {}, { recoveryLimit: 3 });
+    const probe = new CausalProbe([["Начало "]], {}, { recoveryLimit: 2 });
     let run = "";
     probe.transact((b) => {
       run = b.insertNode("paragraph", 1, "х");
     });
-    probe.advance(1500);
-    [..."вост"].forEach((character, index) =>
-      probe.transact((b) => b.textInsert(run, 1 + index, character)),
-    );
-    expect(probe.writer.exportSession().history.recoveryLog?.entries.length).toBeLessThan(4);
-    expect(probe.restore("undo").status).toBe("requested");
+    // Three separate typing groups: three log entries, one more than the cap.
+    ["в", "о", "ст"].forEach((text, index) => {
+      probe.advance(1500);
+      probe.transact((b) => b.textInsert(run, 1 + index, text));
+    });
+    expect(probe.writer.exportSession().history.recoveryLog?.entries.length).toBeLessThan(3);
+    for (const expected of [["Начало хво"], ["Начало хв"], ["Начало х"]]) {
+      expect(probe.restore("undo").status).toBe("requested");
+      expect(probe.content()).toEqual(expected);
+    }
     expect(probe.restore("undo")).toMatchObject({
       status: "conflict",
       reason: "the deletion would remove concurrently edited content",
     });
     expect(probe.content()).toEqual(["Начало х"]);
     expect(() => new CausalProbe([["Начало "]], {}, { recoveryLimit: -1 })).toThrow(RangeError);
+  });
+
+  test("MR45 Inside a group mergeable edits become one primitive; other kinds stay parts", () => {
+    const probe = new CausalProbe();
+    let span = "";
+    probe.writer.beginGroup("insert element");
+    probe.transact((b) => {
+      span = b.insertNode("paragraph", 1, { tag: "span", props: {}, children: [] });
+    });
+    for (const value of ["a", "ab", "abc"]) probe.transact((b) => b.set(span, "value", value));
+    probe.writer.endGroup();
+    const group = probe.writer.history.list().at(-1);
+    // Field chain absent → "abc" is one assignment, followed by the node's removal.
+    expect(group?.undo).toMatchObject({
+      changes: [{ kind: "set", path: ["value"], before: "abc" }, { kind: "nodeDelete" }],
+    });
+    expect(group?.undo).not.toHaveProperty("changes.0.after");
+    probe.advance(1500);
+    const text = probe.room.authority.getTable().get("paragraph")?.children[0] ?? "";
+    for (let index = 0; index < 3; index += 1)
+      probe.transact((b) => b.textDelete(text, 6 - index, 1));
+    probe.advance(1500);
+    for (let index = 0; index < 2; index += 1) probe.transact((b) => b.textDelete(text, 0, 1));
+    const [backspace, forward] = probe.writer.history.list().slice(-2);
+    // One re-insertion each, the backspace one already mapped past the later forward deletes.
+    expect(backspace?.undo).toMatchObject({ changes: [{ offset: 2, text: "ло " }] });
+    expect(forward?.undo).toMatchObject({ changes: [{ offset: 0, text: "На" }] });
+    const element = { tag: "span", props: { value: "abc" }, content: [] };
+    expect(probe.exhaust("undo")).toEqual([["Нача", element], ["Начало ", element], ["Начало "]]);
+    expect(probe.exhaust("redo").at(-1)).toEqual(["ча", element]);
   });
 
   test("MR45 Recovery state survives a session export and restore", () => {

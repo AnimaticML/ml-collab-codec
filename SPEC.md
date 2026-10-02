@@ -734,7 +734,8 @@ not scale one hot document across independent accepting nodes (§18.12).
   request id is `(replica, n)` and every primitive it builds carries the origin
   `(replica, n, ordinal)`. Packing a later unsent change into an earlier request keeps
   the earlier request id and each primitive's original origin (`meta.packed` lists the
-  absorbed sequences). Rebase, expansion, composition, and inversion keep origins;
+  absorbed sequences). Rebase, expansion, composition, and inversion keep origins; a
+  record merged by composition keeps the lower (earliest) origin of its parts (§20);
   an undo/redo request gets a new request id while its restored primitives keep the
   origins of the contribution they restore.
 - **Contexts:** `meta.authoredRevision` and `meta.predecessors` record what the author
@@ -866,7 +867,8 @@ indexed lazy derivations over prop/text/children/external inputs, injected
   delta sum); otherwise it stays a separate request. In-flight and accepted requests
   are never rewritten. `noCoalescing` keeps every sample (trajectory recording).
 - `UndoHistory` keeps, per own group, a current-context undo handle: an own member's
-  inverse is prepended, every other confirmed transition rebases the handle. A handle
+  inverse is composed in front of it (a typing run stays one primitive, §20), every
+  other confirmed transition rebases the handle. A handle
   that meets an incompatible later change becomes a conflict; when that change was an
   own group's, undoing that group restores the handle (§20). `undo()`/`undo(group)`
   cancels unsent members locally, defers while a member is in flight (and sends the
@@ -1118,11 +1120,34 @@ transform correctly refuses to delete or overwrite content it does not own.
   (an interleaved explicit group), its recovery is dropped as before. The log and
   recoveries are part of `HistoryExport` (`recoveryLog`), so exported sessions keep them;
   sessions without it, or with the earlier per-handle form, load with recovery dropped.
-- **Cost.** Typing cost is unchanged from before the repair (measured: three 500-keystroke
-  bursts after creating a run). Replaying a recovery took about 5 ms in that scenario. A
-  separate pre-existing cost remains: a group's handle keeps one primitive per keystroke,
-  so undoing a long typing group maps every other long handle over a long transition
-  (quadratic in burst length; about 2.3 s for 500-keystroke groups, same as before).
+- **Composition inside a group.** Grouping (application policy) decides which edits form
+  one undoable action; inside a group, everything `compose` can merge exactly is stored
+  merged: an own member's inverse is composed into the undo handle, and consecutive own
+  members of one group with no other transition between them are one entry in the
+  recovery log (unless a handle's clean context falls between them). Typing, backspace
+  and forward-delete runs, same-field assignment chains and delta sums become one
+  primitive; different kinds (create a node, then fill it) stay ordered parts of the
+  group. Composition is exact sequential equivalence, so it is not a policy choice;
+  `CoalescingPolicy` still governs what is packed into unsent requests, and accepted
+  transitions are never rewritten (each revision stays a commit and catch-up point).
+- **Canonical composition.** A merged record keeps the lower origin of its parts, and a
+  text insertion directly in front of the previous one merges too (the inverse of a
+  forward-delete run). Then a group's inverses composed newest first equal the inverse
+  of its composed changes, which the recovery check relies on: it composes the carried
+  inverses of all cancelled members and compares them with the accepted undo/redo.
+  Assignment and delta origins are inert (never consulted by transforms) and are
+  compared without origin, since a chain through a net-zero point keeps a
+  fold-order-dependent one. The seeded R13 property (`r-composition.test.ts`) checks
+  that transforming against a composed run matches transforming against its parts:
+  same converged states, and no added conflict except where the composite judges an
+  assignment chain by its net write (part-wise, a step coinciding with the other side's
+  write is absorbed and later steps silently overwrite it); a composite that is a no-op
+  after the other side cannot conflict where a part would. `dropped` now counts merged
+  records, not keystrokes.
+- **Cost.** Three 500-keystroke groups after creating a run: typing 120/183/273 ms per
+  burst, undo of all four groups 5 ms, redo 2 ms, session 11 KB (before composition:
+  about 6.5 s and 6 s, because every handle kept one primitive per keystroke and long
+  handles were mapped over long transitions quadratically).
 - **Grouping is separate.** Typing policy and explicit groups are unchanged. The repair
   makes undo work across any boundary (default policy, pause, caret movement, explicit
   segments); an application may still choose larger explicit groups for its own UX.

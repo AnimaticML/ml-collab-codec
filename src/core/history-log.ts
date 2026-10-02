@@ -1,4 +1,5 @@
 import type { LogEntry } from "./history-recovery.ts";
+import { compose } from "./compose.ts";
 import { cancelPairs } from "./history-recovery.ts";
 
 /** The serialized recovery log: transitions after revision `start`, oldest first. */
@@ -52,6 +53,20 @@ export class RecoveryLog {
 
   append(entry: LogEntry): void {
     this.entries.push(entry);
+    this.reduced.clear();
+  }
+
+  /**
+   * Store an own member right after the previous member of its group as one
+   * composed entry, unless a handle's clean context lies between the two.
+   */
+  composeLast(split: boolean): void {
+    const last = this.entries[this.entries.length - 1];
+    const previous = this.entries[this.entries.length - 2];
+    if (split || last?.own?.kind !== "do" || previous?.own?.kind !== "do") return;
+    if (previous.own.group !== last.own.group || previous.revision !== last.revision - 1) return;
+    const merged: LogEntry = { ...last, changes: compose(previous.changes, last.changes) };
+    this.entries.splice(this.entries.length - 2, 2, merged);
     this.reduced.clear();
   }
 

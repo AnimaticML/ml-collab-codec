@@ -1,5 +1,6 @@
 import type { Change } from "./change.ts";
 import { invertChanges } from "./change.ts";
+import { compose } from "./compose.ts";
 import type { RecoveryLogExport } from "./history-log.ts";
 import { cancels, RecoveryLog } from "./history-log.ts";
 import type { CleanHandle, LogEntry, Recovery } from "./history-recovery.ts";
@@ -102,10 +103,14 @@ function tagOf(transition: TransitionEvent, own: boolean): LogEntry["own"] {
   return meta.group === undefined ? undefined : { group: meta.group, kind: "do" };
 }
 
-/** A new own member's inverse runs first; recovery cannot span the group's own growth. */
+/**
+ * A new own member's inverse runs first and is composed into the handle, so
+ * a typing run, a deletion run or a same-field chain stays one primitive.
+ * Recovery cannot span the group's own growth.
+ */
 function prepend(inverse: readonly Change[], handle: Handle): Handle {
   if ("conflict" in handle) return { conflict: handle.conflict };
-  return { changes: [...inverse, ...handle.changes], dropped: handle.dropped };
+  return { changes: compose(inverse, handle.changes), dropped: handle.dropped };
 }
 
 /**
@@ -220,6 +225,7 @@ export class UndoHistory {
       this.groups.set(group.id, { ...group, undo, ...(redo === undefined ? {} : { redo }) });
     }
     if (target !== undefined) this.applyOwn(target, transition.meta, inverse);
+    if (tag?.kind === "do") this.log.composeLast(this.contexts().includes(entry.revision - 1));
     this.trim();
   }
 
@@ -254,12 +260,7 @@ export class UndoHistory {
    * no longer covers, for example past a configured `recoveryLimit`.
    */
   private trim(): void {
-    const froms = [...this.groups.values()].flatMap((group) =>
-      [
-        group.state === "active" ? group.undo.recovery?.from : undefined,
-        group.state === "undone" ? group.redo?.recovery?.from : undefined,
-      ].filter((from): from is number => typeof from === "number"),
-    );
+    const froms = this.contexts();
     this.log.retain(froms.length === 0 ? undefined : Math.min(...froms), this.revision);
     for (const group of this.groups.values()) {
       const undo = usable(group.undo, this.log, group.state === "active") ?? EMPTY;
@@ -267,6 +268,16 @@ export class UndoHistory {
       if (undo !== group.undo || redo !== group.redo)
         this.groups.set(group.id, { ...group, undo, ...(redo === undefined ? {} : { redo }) });
     }
+  }
+
+  /** Revisions at which usable degraded handles were last clean. */
+  private contexts(): number[] {
+    return [...this.groups.values()].flatMap((group) =>
+      [
+        group.state === "active" ? group.undo.recovery?.from : undefined,
+        group.state === "undone" ? group.redo?.recovery?.from : undefined,
+      ].filter((from): from is number => typeof from === "number"),
+    );
   }
 
   /** Latest own group that can still be undone (skipping spent ones). */

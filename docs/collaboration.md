@@ -36,6 +36,12 @@ work, so other people's edits survive. Results are explicit: `requested`, `defer
 original is still in flight), `cancelledLocally` (the work was never sent),
 `noRemainingEffect`, `conflict` (a later incompatible change), or `unavailable`.
 
+Grouping decides what one undo step covers; inside a group, the history stores what it can
+merge exactly as one operation. A typing run, a backspace or forward-delete run, a chain of
+writes to one field, or a sum of deltas becomes a single primitive in the undo handle (and in
+saved sessions); edits of different kinds, such as creating an element and then filling it,
+stay ordered parts of the same group and are undone together.
+
 Later **own** groups are causal, not concurrent. Creating a text run and then typing into it
 in a separate group, or writing one field three times in three groups, temporarily makes the
 earlier handle unusable (deleting the run would remove the later text; restoring the first

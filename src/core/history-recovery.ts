@@ -1,6 +1,7 @@
 import type { Change } from "./change.ts";
 import { invertChanges } from "./change.ts";
 import { canonicalJson } from "./change-codec.ts";
+import { compose } from "./compose.ts";
 import { isConflict, transformPair } from "./transform.ts";
 
 /** Complete reversible primitives in the client's confirmed context, with how many contributions lost effect. */
@@ -116,17 +117,23 @@ function exclude(
   return { inverse, after };
 }
 
-/** Whether `changes` continues at `offset` with exactly `prefix`. */
-function continuesWith(
-  changes: readonly Change[],
-  offset: number,
-  prefix: readonly Change[],
-): boolean {
+/**
+ * A record's effect for verification. Assignments and deltas never consult
+ * their origin (no placement ties; their inverses are assignments and
+ * deltas again), and which origin survives a chain that passes through a
+ * net-zero point depends on composition order, so it is left out for them.
+ */
+function effect(change: Change): string {
+  if (change.kind !== "set" && change.kind !== "delta") return canonicalJson(change);
+  const { origin: _origin, ...rest } = change;
+  return canonicalJson(rest);
+}
+
+/** Whether `changes` begins with exactly the effects of `prefix`. */
+function beginsWith(changes: readonly Change[], prefix: readonly Change[]): boolean {
   return (
-    offset + prefix.length <= changes.length &&
-    prefix.every(
-      (change, index) => canonicalJson(change) === canonicalJson(changes[offset + index]),
-    )
+    prefix.length <= changes.length &&
+    prefix.every((change, index) => effect(change) === effect(changes[index] as Change))
   );
 }
 
@@ -140,29 +147,31 @@ function relation(last: LogEntry, entry: LogEntry): "cancels" | "stop" | "skip" 
 
 /**
  * Cancel the newest entry — an own undo or redo — against the effects of
- * its group earlier in the sequence, latest first. Each cancellation is
- * verified: the accepted undo/redo must begin with exactly that effect's
- * inverse carried to its context. The unmatched remainder stays as an
- * entry. Returns undefined when nothing was cancelled.
+ * its group earlier in the sequence, latest first. Removing each effect
+ * carries its inverse forward; the carried inverses, composed in undo order,
+ * must be exactly how the accepted undo/redo begins (members are composed in
+ * the handle the same way), otherwise nothing is cancelled. The unmatched
+ * remainder (effects absorbed before the sequence) stays as an entry.
+ * Returns undefined when nothing was cancelled.
  */
 export function cancelPairs(entries: readonly LogEntry[]): LogEntry[] | undefined {
   const last = entries[entries.length - 1];
   if (last?.own === undefined || last.own.kind === "do") return undefined;
   const log = entries.slice(0, -1);
-  let matched = 0;
+  let inverse: Change[] = [];
   let cancelled = false;
   for (let index = log.length - 1; index >= 0; index -= 1) {
     const kind = relation(last, log[index] as LogEntry);
     if (kind === "skip") continue;
     const excluded = kind === "cancels" ? exclude(log, index) : undefined;
-    if (excluded === undefined || !continuesWith(last.changes, matched, excluded.inverse)) break;
-    matched += excluded.inverse.length;
+    if (excluded === undefined) break;
+    inverse = compose(inverse, excluded.inverse);
     log.length = index;
     for (const entry of excluded.after) log.push(entry);
     cancelled = true;
     if (last.own.kind === "redo") break;
   }
-  if (!cancelled) return undefined;
-  const rest = last.changes.slice(matched);
+  if (!cancelled || !beginsWith(last.changes, inverse)) return undefined;
+  const rest = last.changes.slice(inverse.length);
   return rest.length === 0 ? log : [...log, { ...last, changes: rest }];
 }
