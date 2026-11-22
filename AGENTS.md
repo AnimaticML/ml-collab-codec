@@ -167,3 +167,11 @@ and no dependency on server/history for local file opening. The owner selected
 Apache-2.0 and a public GitHub repository; npm publishing (removing `"private": true`)
 still needs a separate owner decision. Do not push to
 an unspecified remote, publish a package, or modify the legacy reference repository.
+
+## Consumer documentation lifecycle
+
+`docs/methodology/` and `docs/development-guides/` are permanent documentation for
+applications developed using this repository's product. Keep them after implementation
+or setup; do not treat them as completed-task handoffs. Their quality recipes are
+consumer adoption recommendations, not automatic replacements for this repository's
+accepted quality and verification policy. See [documentation navigation](docs/README.md).

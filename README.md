@@ -10,6 +10,13 @@ Licensed under the Apache License 2.0 (`LICENSE`). Source:
 <https://github.com/AnimaticML/ml-collab-codec>. The package is not published to a registry
 (`"private": true`); consume a pinned commit (see [Installation](docs/installation.md)).
 
+## Build an application with this library
+
+Start with the [documentation index](docs/README.md): API usage, permanent
+[application methodology](docs/methodology/README.md), and optional
+[development and quality recommendations](docs/development-guides/README.md).
+Methodology is maintained product documentation, not a completed task handoff.
+
 ## Example
 
 ```ts
