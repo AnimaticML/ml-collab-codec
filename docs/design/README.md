@@ -1,8 +1,8 @@
-# Application development with codec
+# Application design
 
 This is maintained documentation for applications developed using the library,
 not an internal assignment to build it. Retain and update it after initial adoption.
-The [development recommendations](../development-guides/README.md), including quality
+The [development recommendations](../development/README.md), including quality
 controls, are optional until a consuming project adopts them. Library/application
 contracts and existing contributor policies remain authoritative in their own scope.
 
@@ -16,3 +16,7 @@ sketches and product implementation can alternate. Choose the smallest useful st
 from available evidence. Record what is intended, implemented and verified, the next
 bounded outcome and any required human decision. This guide does not prescribe a UI
 host, transport, production service or fixed phase order.
+
+Generic practices live in [development guides](../development/README.md).
+When exporting the complete methodology, include those linked guides; the development
+guide bundle remains independently copyable.

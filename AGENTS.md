@@ -170,7 +170,7 @@ an unspecified remote, publish a package, or modify the legacy reference reposit
 
 ## Consumer documentation lifecycle
 
-`docs/methodology/` and `docs/development-guides/` are permanent documentation for
+`docs/design/` and `docs/development/` are permanent documentation for
 applications developed using this repository's product. Keep them after implementation
 or setup; do not treat them as completed-task handoffs. Their quality recipes are
 consumer adoption recommendations, not automatic replacements for this repository's

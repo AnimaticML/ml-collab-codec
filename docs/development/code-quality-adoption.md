@@ -1,4 +1,4 @@
-# Code quality adoption handoff
+# Code quality adoption
 
 Establish an enforceable quality contract for a new or existing repository. Inspect its
 instructions, architecture, tooling and Git state; preserve accepted behavior and

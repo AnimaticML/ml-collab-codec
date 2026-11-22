@@ -1,6 +1,6 @@
 # Modular code quality configuration companion
 
-Use with the [adoption handoff](code-quality-adoption-handoff.md), which owns module
+Use with the [quality adoption guide](code-quality-adoption.md), which owns module
 selection, acceptance, gate semantics, development cadence and spending policy. This
 companion supplies implementation recipes, not a standalone executable setup. “Core”
 here means the selected Bun/TypeScript profile; other projects need not adopt it.
@@ -294,7 +294,7 @@ not a working setup.
 
 Implement `tools/check.ts` with sequential awaited `Bun.spawn` calls and inherited
 diagnostics, following the [gate
-contract](code-quality-adoption-handoff.md#gate-contract). Use `build:bundle` internally
+contract](code-quality-adoption.md#gate-contract). Use `build:bundle` internally
 to avoid repeated type checking, extending it for workspace/declaration/consumer checks.
 Report `core` explicitly when `--core` is used.
 
@@ -309,7 +309,7 @@ unknown scopes/arguments and explicitly empty selections.
 ## Optional browser module: Playwright
 
 Follow the [browser
-cadence](code-quality-adoption-handoff.md#test-strategy-and-cadence). Derive engines,
+cadence](code-quality-adoption.md#test-strategy-and-cadence). Derive engines,
 devices and viewports from product support; broad web support includes Chromium, Firefox
 and WebKit. Narrower coverage needs a support decision, not cost alone. Require explicit
 engine/part selection and reject missing/unknown/empty values. Install binaries matching
@@ -346,7 +346,7 @@ different direct all-engine diagnostic scheduling.
 ## Independent CI implementation
 
 Apply the [CI coverage and spending
-policy](code-quality-adoption-handoff.md#independent-ci-and-spending-policy). Use the
+policy](code-quality-adoption.md#independent-ci-and-spending-policy). Use the
 same underlying commands/configs and immutable event SHA in every checkout. A practical
 layout is one core job plus a browser matrix only when adopted; size parts/shards from
 measured budgets, not a fixed matrix. Share the browser manifest, disable matrix
@@ -373,9 +373,9 @@ persistence and durable effects as applicable.
 ## Configuration acceptance
 
 Apply the [acceptance
-scope](code-quality-adoption-handoff.md#select-modules-and-acceptance-scope) and
+scope](code-quality-adoption.md#select-modules-and-acceptance-scope) and
 [delivery
-requirements](code-quality-adoption-handoff.md#prove-enforcement-and-deliver-evidence).
+requirements](code-quality-adoption.md#prove-enforcement-and-deliver-evidence).
 Verify the frozen install, all adopted source/entry coverage, real positive/negative
 tool fixtures, formatter CLI wiring, gate/report failures, optional core/full
 separation, browser partition/shard discovery and flaky rejection. Execute applicable

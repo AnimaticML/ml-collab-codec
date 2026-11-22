@@ -13,8 +13,8 @@ Licensed under the Apache License 2.0 (`LICENSE`). Source:
 ## Build an application with this library
 
 Start with the [documentation index](docs/README.md): API usage, permanent
-[application methodology](docs/methodology/README.md), and optional
-[development and quality recommendations](docs/development-guides/README.md).
+[application design](docs/design/README.md), and optional
+[development and quality recommendations](docs/development/README.md).
 Methodology is maintained product documentation, not a completed task handoff.
 
 ## Example

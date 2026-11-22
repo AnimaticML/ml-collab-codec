@@ -21,9 +21,9 @@ API-example claims.
 
 ## Develop applications using the library
 
-- [Application methodology](methodology/README.md): human/agent products, flexible
+- [Application design](design/README.md): human/agent products, flexible
   experimentation and concrete codec integration. Retain it after initial adoption.
-- [Development recommendations](development-guides/README.md): optional quality
+- [Development recommendations](development/README.md): optional quality
   baseline and configuration recipes for the consuming application.
 
 ## Contribute to the library
