@@ -26,6 +26,19 @@ API-example claims.
 - [Development recommendations](development/README.md): optional quality
   baseline and configuration recipes for the consuming application.
 
+## World and runtime proposals
+
+The `proposal-world-runtime-` series records owner-requested research and
+integration handoffs across Canvas IR, Video, Codec and Shell.
+
+- [Document composition and component evolution](proposals/proposal-world-runtime-composition-and-evolution.md)
+  investigates reusable schema components, identity, static embedding and later
+  live extension. Start with a public-API consumer example; proposed mechanisms
+  are not implemented library contracts.
+
+The handoff links all seven documents in the series. Find local files with
+`rg --files | rg '(^|/)proposal-world-runtime-'`.
+
 ## Contribute to the library
 
 Repository `AGENTS.md`, `SPEC.md`, `ACCEPTANCE.md` and the verification guide govern
