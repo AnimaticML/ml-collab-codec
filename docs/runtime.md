@@ -28,7 +28,11 @@ visible content changes. `subscribeCommits` delivers one `ModelCommit` per publi
 deleted, props, text, children, moved, retagged) and the address `mapping` from previous to
 next (for anchors: `mapAnchor`). Acknowledgements and receipts that do not change content
 go to `subscribeStatus`. Subscriber exceptions go to `subscribeErrors`; they never undo a
-publication. Edits made from inside a subscriber run after delivery as their own commit.
+publication. Transactions, incoming events, cancellations, undo, redo and resync requested
+inside a subscriber run as later batches, after both the current commit and status delivery.
+Transactions, undo and redo return `{ status: "queued" }` in that case. Cancellation returns
+`true` when the request is currently unsent and the cancellation was queued. The client
+checks eligibility again when it runs.
 
 ## Derived state and scheduling
 

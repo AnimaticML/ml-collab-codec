@@ -848,7 +848,7 @@ same object until content changes. `ChangeSummary` lists conservative `candidate
 and verified created/deleted/props/text/children/moved changes; a restore without a
 primitive mapping uses a full-resync summary. Subscriber exceptions go to
 `subscribeErrors` and never uncommit; writes during delivery are queued and run as
-later batches. Headless adapters: `ClassProjection` (two-phase install by node id,
+later batches after both commit and status notification. Headless adapters: `ClassProjection` (two-phase install by node id,
 reference resolution, one graph update per commit), `DerivedGraph` (dependency-
 indexed lazy derivations over prop/text/children/external inputs, injected
 `Scheduler`, synchronous demand, versioned async jobs, cycle diagnosis), and

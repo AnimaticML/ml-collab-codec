@@ -145,11 +145,9 @@ export class Client implements DocumentStore {
 
   /** Author one local change against the visible state. Never waits for the network. */
   transact(build: (builder: ChangeBuilder) => void): TransactResult {
-    if (this.publisher.isDelivering()) {
-      this.publisher.defer(() => void this.transact(build));
-      return { status: "queued" };
-    }
-    return this.publisher.batch("local", () => this.author(build, {}, "local"));
+    return this.publisher.batch("local", () => this.author(build, {}, "local"), {
+      status: "queued",
+    });
   }
 
   /** Shared authoring path for local edits and undo/redo requests. */
@@ -242,24 +240,24 @@ export class Client implements DocumentStore {
           "wrongDocument",
           "event belongs to a different document or history epoch",
         );
-    if (this.publisher.isDelivering()) {
-      this.publisher.defer(() => this.receive(list));
-      return;
-    }
-    this.publisher.batch("remote", () => {
-      this.inbox.accept(list, this.state.revision);
-      this.inbox.drain(this);
-      const deferred = this.deferredUndo;
-      if (
-        deferred !== undefined &&
-        !this.state.pending.some(
-          (entry) => entry.meta.group === deferred && entry.state !== "unsent",
-        )
-      ) {
-        this.deferredUndo = undefined;
-        runUndo(this, deferred);
-      }
-    });
+    this.publisher.batch(
+      "remote",
+      () => {
+        this.inbox.accept(list, this.state.revision);
+        this.inbox.drain(this);
+        const deferred = this.deferredUndo;
+        if (
+          deferred !== undefined &&
+          !this.state.pending.some(
+            (entry) => entry.meta.group === deferred && entry.state !== "unsent",
+          )
+        ) {
+          this.deferredUndo = undefined;
+          runUndo(this, deferred);
+        }
+      },
+      undefined,
+    );
   }
 
   /**
@@ -270,47 +268,67 @@ export class Client implements DocumentStore {
    * whose context no longer exists. Nothing is guessed or replayed.
    */
   resync(table: Table, revision: number, reason: string): void {
-    this.publisher.batch("restore", () => {
-      const retained = this.state.pending.map((entry) => ({
-        id: entry.id,
-        meta: entry.meta,
-        working: entry.working,
-        status: "resync" as const,
-        reason,
-      }));
-      this.history.forgetAll(revision);
-      this.historyStatus = { status: "unavailable", reason };
-      this.inbox.clear();
-      const state = {
-        confirmed: table,
-        revision,
-        pending: [],
-        retained: [...this.state.retained, ...retained],
-        visible: table,
-      };
-      this.commitStep({ state, mapping: [] }, "restore", [`resync: ${reason}`]);
-      this.publisher.stageRestore(table);
-    });
+    this.publisher.batch(
+      "restore",
+      () => {
+        const retained = this.state.pending.map((entry) => ({
+          id: entry.id,
+          meta: entry.meta,
+          working: entry.working,
+          status: "resync" as const,
+          reason,
+        }));
+        this.history.forgetAll(revision);
+        this.historyStatus = { status: "unavailable", reason };
+        this.inbox.clear();
+        const state = {
+          confirmed: table,
+          revision,
+          pending: [],
+          retained: [...this.state.retained, ...retained],
+          visible: table,
+        };
+        this.commitStep({ state, mapping: [] }, "restore", [`resync: ${reason}`]);
+        this.publisher.stageRestore(table);
+      },
+      undefined,
+    );
   }
 
-  /** Cancel a genuinely unsent local request; dependents that cannot survive are retained as blocked. */
+  /**
+   * Cancel an unsent local request. During publication, true means the cancellation
+   * was queued. Eligibility is checked again when the queued cancellation runs.
+   */
   cancel(request: RequestId): boolean {
-    const entry = this.state.pending.find((candidate) => sameRequest(candidate.id, request));
-    if (entry === undefined || entry.state !== "unsent") return false;
-    this.publisher.batch("reconcile", () =>
-      this.commitStep(
-        exclude(this.state, new Map<string, Exclusion>([[requestKey(request), { kind: "drop" }]])),
-      ),
+    if (!this.isUnsent(request)) return false;
+    return this.publisher.batch(
+      "reconcile",
+      () => {
+        if (!this.isUnsent(request)) return false;
+        this.commitStep(
+          exclude(
+            this.state,
+            new Map<string, Exclusion>([[requestKey(request), { kind: "drop" }]]),
+          ),
+        );
+        return true;
+      },
+      true,
     );
-    return true;
+  }
+
+  private isUnsent(request: RequestId): boolean {
+    return this.state.pending.some(
+      (entry) => entry.state === "unsent" && sameRequest(entry.id, request),
+    );
   }
 
   undo(group?: string): UndoResult {
-    return this.publisher.batch("undo", () => runUndo(this, group));
+    return this.publisher.batch("undo", () => runUndo(this, group), { status: "queued" });
   }
 
   redo(group?: string): UndoResult {
-    return this.publisher.batch("redo", () => runRedo(this, group));
+    return this.publisher.batch("redo", () => runRedo(this, group), { status: "queued" });
   }
 
   /** A remote document change was integrated (closes automatic typing groups). */

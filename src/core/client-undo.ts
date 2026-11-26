@@ -12,9 +12,10 @@ import { isConflict, transformPair } from "./transform.ts";
 /**
  * Outcome of an undo/redo command. `requested` enqueued a new request linked
  * to the group; `deferred` waits for an in-flight member's receipt;
- * `cancelledLocally` removed only unsent work; the rest change nothing.
+ * `cancelledLocally` removed only unsent work; `queued` runs after publication.
  */
 export type UndoResult =
+  | { readonly status: "queued"; readonly group?: string }
   | {
       readonly status: "requested";
       readonly group: string;

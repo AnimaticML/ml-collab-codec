@@ -118,36 +118,36 @@ Save this required diagnostic formatter as `tools/formatter.ts`. Point its guide
 an existing style-guide section, creating the section if necessary:
 
 ```ts
-import type { ESLint } from 'eslint'
+import type { ESLint } from "eslint";
 
 const advice: Record<string, string> = {
-  'max-lines-per-function':
-    'Separate responsibilities and name intermediate concepts; never split mechanically by line count.',
+  "max-lines-per-function":
+    "Separate responsibilities and name intermediate concepts; never split mechanically by line count.",
   complexity:
-    'Separate traversal, domain decisions, and effects; simplify the main path without hiding branches in callbacks.',
-  'max-depth':
-    'Simplify the main path with explicit concepts and guard clauses; do not hide branching in callbacks.',
-  'max-nested-callbacks':
-    'Separate traversal from decisions and effects; do not move branching into more callbacks.',
-  'max-params':
-    'Reconsider responsibilities and cohesive concepts; never create an options bag solely to meet a limit.',
-}
+    "Separate traversal, domain decisions, and effects; simplify the main path without hiding branches in callbacks.",
+  "max-depth":
+    "Simplify the main path with explicit concepts and guard clauses; do not hide branching in callbacks.",
+  "max-nested-callbacks":
+    "Separate traversal from decisions and effects; do not move branching into more callbacks.",
+  "max-params":
+    "Reconsider responsibilities and cohesive concepts; never create an options bag solely to meet a limit.",
+};
 
-const formatter: ESLint.Formatter['format'] = (results) =>
+const formatter: ESLint.Formatter["format"] = (results) =>
   results
     .flatMap((result) =>
       result.messages.map((message) => {
-        const rule = message.ruleId ?? 'fatal'
-        const diagnostic = `${result.filePath}:${String(message.line)}:${String(message.column)} ${message.severity === 2 ? 'error' : 'warning'} ${rule} ${message.message}`
-        const instruction = advice[rule]
+        const rule = message.ruleId ?? "fatal";
+        const diagnostic = `${result.filePath}:${String(message.line)}:${String(message.column)} ${message.severity === 2 ? "error" : "warning"} ${rule} ${message.message}`;
+        const instruction = advice[rule];
         return instruction
           ? `${diagnostic}\n  Guidance: ${instruction} See docs/code-style.md#function-design`
-          : diagnostic
+          : diagnostic;
       }),
     )
-    .join('\n') + '\n'
+    .join("\n") + "\n";
 
-export default formatter
+export default formatter;
 ```
 
 The `lint` command below wires the official `ESLint.Formatter['format']` API into

@@ -158,6 +158,68 @@ describe("R23–R26 publication batches and derived state", () => {
     expect(q.getSnapshot().table.get(ROOT_ID)?.props["x"]).toBe(1);
   });
 
+  test("R26 Observer cancellation follows the original commit and status", () => {
+    const room = new Room(listDoc({ x: 0 }));
+    const client = room.join("a", "replica-a");
+    const seen: unknown[] = [];
+    client.subscribeCommits((commit) => {
+      const request = commit.next.basis.pending[0];
+      if (request !== undefined) seen.push(["cancel queued", client.cancel(request)]);
+    });
+    client.subscribeCommits((commit) => {
+      seen.push(["commit", commit.next.contentRevision, client.getSnapshot().contentRevision]);
+    });
+    client.subscribeStatus((status) => {
+      seen.push(["status", status.pending.length, client.getStatus().unsent.length]);
+    });
+
+    client.transact((b) => b.set(ROOT_ID, "x", 1));
+    expect(seen).toEqual([
+      ["cancel queued", true],
+      ["commit", 1, 1],
+      ["status", 1, 1],
+      ["commit", 2, 2],
+      ["status", 0, 0],
+    ]);
+    expect(client.getSnapshot().table.get(ROOT_ID)?.props["x"]).toBe(0);
+  });
+
+  test("R26 Observers queue undo, redo, and resync until delivery ends", () => {
+    const room = new Room(listDoc({ x: 0 }));
+    const client = room.join("a", "replica-a");
+    const initial = client.getSnapshot().table;
+    const seen: unknown[] = [];
+    client.transact((b) => b.set(ROOT_ID, "x", 1));
+    const offUndo = client.subscribeStatus((status) => {
+      if (status.confirmedRevision === 1 && status.pending.length === 0)
+        seen.push(client.undo().status);
+    });
+    client.subscribeStatus((status) => {
+      seen.push([
+        status.confirmedRevision,
+        status.pending.length,
+        client.getSnapshot().contentRevision,
+      ]);
+    });
+    room.settle();
+    offUndo();
+    expect(seen).toEqual(["queued", [1, 0, 1], [1, 1, 2], [2, 0, 2]]);
+
+    seen.length = 0;
+    // A remote commit leaves the local redo handle intact.
+    const remote = room.join("b", "replica-b");
+    client.subscribeCommits((commit) => {
+      if (commit.cause === "remote") seen.push(client.redo().status);
+      if (commit.cause === "redo") client.resync(initial, 3, "test restore");
+    });
+    remote.transact((b) => b.set(ROOT_ID, "title", "remote"));
+    room.send("b");
+    room.deliver("a");
+    expect(seen).toEqual(["queued", [3, 0, 3], [3, 1, 4], [3, 0, 5]]);
+    expect(client.getSnapshot().table).toBe(initial);
+    expect(client.getStatus().retained.at(-1)?.status).toBe("resync");
+  });
+
   test("R26 Failures and reentrant observers preserve the boundary", () => {
     const room = new Room(listDoc({ x: 0, title: "t" }));
     const client = room.join("a", "replica-a");

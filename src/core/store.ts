@@ -61,6 +61,7 @@ export class Publisher implements DocumentStore {
   private staged: Staged | undefined;
   private depth = 0;
   private delivering = false;
+  private draining = false;
   private readonly deferred: (() => void)[] = [];
   private readonly commitListeners = new Set<(commit: ModelCommit) => void>();
   private readonly statusListeners = new Set<(status: StatusEvent) => void>();
@@ -90,19 +91,12 @@ export class Publisher implements DocumentStore {
     return () => this.errorListeners.delete(listener);
   }
 
-  /** True while listeners are being called; writes must be deferred. */
-  isDelivering(): boolean {
-    return this.delivering;
-  }
-
-  /** Run `task` after the current delivery (or now, when not delivering). */
-  defer(task: () => void): void {
-    if (this.delivering) this.deferred.push(task);
-    else task();
-  }
-
-  /** Run `work` as one publication batch; nested batches join the outer one. Failures discard the stage. */
-  batch<T>(cause: CommitCause, work: () => T): T {
+  /** Run one publication batch, or queue it if a publication is being delivered. */
+  batch<T>(cause: CommitCause, work: () => T, queued: T): T {
+    if (this.delivering) {
+      this.deferred.push(() => void this.batch(cause, work, queued));
+      return queued;
+    }
     if (this.depth === 0)
       this.staged = {
         table: this.snapshot.table,
@@ -159,6 +153,21 @@ export class Publisher implements DocumentStore {
     const previous = this.snapshot;
     const summary = summarize(previous.table, staged.table, staged.mapping, staged.fullResync);
     const contentChanged = staged.table !== previous.table && !isEmptySummary(summary);
+    this.delivering = true;
+    try {
+      this.publishEvents(staged, previous, summary, contentChanged);
+    } finally {
+      this.delivering = false;
+    }
+    this.drain();
+  }
+
+  private publishEvents(
+    staged: Staged,
+    previous: DocumentSnapshot,
+    summary: ChangeSummary,
+    contentChanged: boolean,
+  ): void {
     if (contentChanged) {
       this.publications += 1;
       this.snapshot = {
@@ -190,19 +199,22 @@ export class Publisher implements DocumentStore {
   }
 
   private deliver<T>(listeners: ReadonlySet<(value: T) => void>, value: T): void {
-    const outer = this.delivering;
-    this.delivering = true;
-    try {
-      for (const listener of [...listeners]) {
-        try {
-          listener(value);
-        } catch (error) {
-          for (const onError of [...this.errorListeners]) onError(error);
-        }
+    for (const listener of [...listeners]) {
+      try {
+        listener(value);
+      } catch (error) {
+        for (const onError of [...this.errorListeners]) onError(error);
       }
-    } finally {
-      this.delivering = outer;
     }
-    if (!outer) while (this.deferred.length > 0) this.deferred.shift()?.();
+  }
+
+  private drain(): void {
+    if (this.draining) return;
+    this.draining = true;
+    try {
+      while (this.deferred.length > 0) this.deferred.shift()?.();
+    } finally {
+      this.draining = false;
+    }
   }
 }

@@ -13,20 +13,22 @@ direction. Proposed schemas, package names, interfaces and execution guarantees
 still require the worked examples below. It does not claim that those capabilities
 are implemented or replace the repository's current public contracts.
 
+The [consumer decision record](../composition.md) reports the runnable Stage A and B examples.
+
 ## Related handoffs
 
 Each repository owns its part of the proposal. The common filename prefix makes
 the seven handoffs discoverable without a separate umbrella repository.
 
-| Repository | Handoff |
-| --- | --- |
-| `AnimaticML/canvas-ir` | [World document, time and shared execution](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-document-and-execution.md) |
-| `AnimaticML/canvas-ir` | [World and motion observation](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-observation.md) |
-| `AnimaticML/canvas-ir` | [Editor Toolkit extraction](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-toolkit.md) |
-| `alexandr-panchenko/video` | [World representations in Animatic](https://github.com/alexandr-panchenko/video/blob/main/docs/architecture/proposal-world-runtime-integration.md) |
-| `alexandr-panchenko/video` | [Animatic observation](https://github.com/alexandr-panchenko/video/blob/main/ml-animatic/docs/proposal-world-runtime-observation.md) |
+| Repository                   | Handoff                                                                                                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AnimaticML/canvas-ir`       | [World document, time and shared execution](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-document-and-execution.md)                       |
+| `AnimaticML/canvas-ir`       | [World and motion observation](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-observation.md)                                               |
+| `AnimaticML/canvas-ir`       | [Editor Toolkit extraction](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-toolkit.md)                                                      |
+| `alexandr-panchenko/video`   | [World representations in Animatic](https://github.com/alexandr-panchenko/video/blob/main/docs/architecture/proposal-world-runtime-integration.md)                         |
+| `alexandr-panchenko/video`   | [Animatic observation](https://github.com/alexandr-panchenko/video/blob/main/ml-animatic/docs/proposal-world-runtime-observation.md)                                       |
 | `AnimaticML/ml-collab-codec` | [Document composition and component evolution](https://github.com/AnimaticML/ml-collab-codec/blob/main/docs/proposals/proposal-world-runtime-composition-and-evolution.md) |
-| `AnimaticML/ml-collab-shell` | [Format/runtime discovery and access](https://github.com/AnimaticML/ml-collab-shell/blob/main/docs/architecture/proposal-world-runtime-capabilities.md) |
+| `AnimaticML/ml-collab-shell` | [Format/runtime discovery and access](https://github.com/AnimaticML/ml-collab-shell/blob/main/docs/architecture/proposal-world-runtime-capabilities.md)                    |
 
 Find the local documents with `rg --files | rg '(^|/)proposal-world-runtime-'`.
 
