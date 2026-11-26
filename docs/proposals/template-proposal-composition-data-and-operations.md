@@ -35,13 +35,13 @@ runtime, or second collaboration engine.
 Baseline: commit `ac61985290b6a8ab4a392961d9cfe70bea5a348d`.
 Recheck the relevant contracts when implementation begins.
 
-| Already implemented | Consequence for this work |
-| --- | --- |
-| [Document model and fragments](../documents.md): one schema identity/version and root, component trees, typed JSON properties, internal operational handles | A template can be document data; composition still needs a valid host schema and explicit placement rules. |
-| [Schemas](../schemas.md): compiled profiles, allowed nesting, stable identities, definition/reference annotations, effective defaults | Reuse this type foundation. Existing schema validation does not implement inline parameter inference or template evaluation. |
-| [Operations](../operations.md): reversible primitives and builders; atomic application | Compile semantic actions to ordinary changes where sufficient. A new user action does not imply a new OT primitive. |
-| [Collaboration](../collaboration.md): authority admission, additional validators and authorization, rebasing, own-group undo | Validators currently inspect a completed candidate and accept or reject it. A general consequence planner or autofix hook is not an existing API. |
-| [Runtime](../runtime.md): derived graphs, publication summaries, class projections | Reuse dependency tracking for projections and inference; these facilities do not already provide template instances or writeback semantics. |
+| Already implemented                                                                                                                                         | Consequence for this work                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Document model and fragments](../documents.md): one schema identity/version and root, component trees, typed JSON properties, internal operational handles | A template can be document data; composition still needs a valid host schema and explicit placement rules.                                        |
+| [Schemas](../schemas.md): compiled profiles, allowed nesting, stable identities, definition/reference annotations, effective defaults                       | Reuse this type foundation. Existing schema validation does not implement inline parameter inference or template evaluation.                      |
+| [Operations](../operations.md): reversible primitives and builders; atomic application                                                                      | Compile semantic actions to ordinary changes where sufficient. A new user action does not imply a new OT primitive.                               |
+| [Collaboration](../collaboration.md): authority admission, additional validators and authorization, rebasing, own-group undo                                | Validators currently inspect a completed candidate and accept or reject it. A general consequence planner or autofix hook is not an existing API. |
+| [Runtime](../runtime.md): derived graphs, publication summaries, class projections                                                                          | Reuse dependency tracking for projections and inference; these facilities do not already provide template instances or writeback semantics.       |
 
 Preserve OT revision v3 and the current [integration contract](../design/codec-integration.md).
 In particular, retain one logical authority per document, frozen retry envelopes,
@@ -105,11 +105,11 @@ information for reproducible reopening; diagnose unavailable implementations.
 
 Use three separate identities:
 
-| Kind | Meaning |
-| --- | --- |
-| Structural occurrence ID | This particular editable node, field occurrence, or instance in document history. |
-| Canonical semantic path and scope | The parameter/entity addressed by all references in that scope. |
-| Human label | Presentation text; it can change or repeat without merging entities. |
+| Kind                              | Meaning                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| Structural occurrence ID          | This particular editable node, field occurrence, or instance in document history. |
+| Canonical semantic path and scope | The parameter/entity addressed by all references in that scope.                   |
+| Human label                       | Presentation text; it can change or repeat without merging entities.              |
 
 Canonical dotted paths build object structure from inline uses. Resolve all
 declarations and uses independently of document order. Within the same scope,
@@ -153,12 +153,12 @@ without relying on fuzzy string matching.
 
 Illustrative declarations, not proposed parser syntax or existing API calls:
 
-| Occurrence | Semantic use | Declared contribution |
-| --- | --- | --- |
-| `field-a` | `participant.name` | string, minimum length 1; label "Name" |
-| `field-b` | `participant.address.city` | string; label "City" |
-| `field-c` | `participant.name` | same scope and path; label "Participant" |
-| `field-d`, added later | `participant.email` | string; label "Email" |
+| Occurrence             | Semantic use               | Declared contribution                    |
+| ---------------------- | -------------------------- | ---------------------------------------- |
+| `field-a`              | `participant.name`         | string, minimum length 1; label "Name"   |
+| `field-b`              | `participant.address.city` | string; label "City"                     |
+| `field-c`              | `participant.name`         | same scope and path; label "Participant" |
+| `field-d`, added later | `participant.email`        | string; label "Email"                    |
 
 Infer one `participant` object with `name`, `address.city`, and `email`. Filling
 `participant.name` with `Ada` updates both name projections while retaining their
@@ -278,10 +278,10 @@ The synthetic format stores ordered items with `start` and positive `duration`,
 measured in integer ticks. Its invariant is non-overlap in stored order. Initially:
 
 | Item | Start | Duration | End |
-| --- | ---: | ---: | ---: |
-| A | 0 | 4 | 4 |
-| B | 4 | 3 | 7 |
-| C | 7 | 2 | 9 |
+| ---- | ----: | -------: | --: |
+| A    |     0 |        4 |   4 |
+| B    |     4 |        3 |   7 |
+| C    |     7 |        2 |   9 |
 
 The action moves B to start 6 using the declared policy "keep durations; push only
 following overlapping items forward." The plan changes B from 4 to 6 and C from
@@ -300,13 +300,13 @@ do not erase that edit or silently invent a new scheduling policy.
 Implement through the existing repository workflow. Record new behavioral cases
 in the canonical acceptance/specification documents before marking them complete.
 
-| Phase | Required result and meaningful acceptance evidence |
-| --- | --- |
-| 1. Native representation and interface | A synthetic document retains definition, occurrences, bindings, and partial data through tagged-source/JSON round trips. Fully filling it retains template elements. Author/fill/result projections use the same state. Open, edit, save, and reopen locally without history or a server. |
-| 2. Semantic paths and inference | Example 1 passes with declaration order permutations; adding a property extends one object; labels do not merge entities. Conflicting carriers produce located diagnostics. One rename updates declarations, expressions, references, and data atomically and is undoable. |
-| 3. Composition and collections | Example 2 passes with nested object, collection, variant, and fragment bindings. Reorder/insert/delete preserve surviving identities. Copy remaps internal references and preserves declared external ones. Validate incomplete results, invalid nesting, and missing dependencies explicitly. |
-| 4. Semantic planning and history | Example 3 passes through built public APIs and the real authority/client path. Failure leaves no accepted partial state; protected consequences reject the whole action. Check concurrent edits, stale plans including structurally valid candidates with stale action scope, duplicate delivery, own undo/redo, bounded rule failure, and absence of postcommit repairs. |
-| 5. Incremental integration | Rebuild the derived model from persisted data, then verify targeted invalidation against that result. An unrelated edit does not reevaluate all bindings or clone the full document. Report representative fixtures, dependency fan-out, operation counts, timing, and remaining limits. |
+| Phase                                  | Required result and meaningful acceptance evidence                                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Native representation and interface | A synthetic document retains definition, occurrences, bindings, and partial data through tagged-source/JSON round trips. Fully filling it retains template elements. Author/fill/result projections use the same state. Open, edit, save, and reopen locally without history or a server.                                                                                 |
+| 2. Semantic paths and inference        | Example 1 passes with declaration order permutations; adding a property extends one object; labels do not merge entities. Conflicting carriers produce located diagnostics. One rename updates declarations, expressions, references, and data atomically and is undoable.                                                                                                |
+| 3. Composition and collections         | Example 2 passes with nested object, collection, variant, and fragment bindings. Reorder/insert/delete preserve surviving identities. Copy remaps internal references and preserves declared external ones. Validate incomplete results, invalid nesting, and missing dependencies explicitly.                                                                            |
+| 4. Semantic planning and history       | Example 3 passes through built public APIs and the real authority/client path. Failure leaves no accepted partial state; protected consequences reject the whole action. Check concurrent edits, stale plans including structurally valid candidates with stale action scope, duplicate delivery, own undo/redo, bounded rule failure, and absence of postcommit repairs. |
+| 5. Incremental integration             | Rebuild the derived model from persisted data, then verify targeted invalidation against that result. An unrelated edit does not reevaluate all bindings or clone the full document. Report representative fixtures, dependency fan-out, operation counts, timing, and remaining limits.                                                                                  |
 
 Test required behavior, not a duplicated implementation algorithm. Include a
 headless non-text fixture and a text-bearing fixture using the same shared module.
