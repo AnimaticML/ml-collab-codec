@@ -25,8 +25,8 @@ the seven handoffs discoverable without a separate umbrella repository.
 | `AnimaticML/canvas-ir`       | [World document, time and shared execution](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-document-and-execution.md)                       |
 | `AnimaticML/canvas-ir`       | [World and motion observation](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-observation.md)                                               |
 | `AnimaticML/canvas-ir`       | [Editor Toolkit extraction](https://github.com/AnimaticML/canvas-ir/blob/main/docs/proposal-world-runtime-toolkit.md)                                                      |
-| `alexandr-panchenko/video`   | [World representations in Animatic](https://github.com/alexandr-panchenko/video/blob/main/docs/architecture/proposal-world-runtime-integration.md)                         |
-| `alexandr-panchenko/video`   | [Animatic observation](https://github.com/alexandr-panchenko/video/blob/main/ml-animatic/docs/proposal-world-runtime-observation.md)                                       |
+| `alexandr-panchenko/video`   | [World representations in ml-animatic](https://github.com/alexandr-panchenko/video/blob/main/docs/architecture/proposal-world-runtime-integration.md)                         |
+| `alexandr-panchenko/video`   | [ml-animatic observation](https://github.com/alexandr-panchenko/video/blob/main/ml-animatic/docs/proposal-world-runtime-observation.md)                                       |
 | `AnimaticML/ml-collab-codec` | [Document composition and component evolution](https://github.com/AnimaticML/ml-collab-codec/blob/main/docs/proposals/proposal-world-runtime-composition-and-evolution.md) |
 | `AnimaticML/ml-collab-shell` | [Format/runtime discovery and access](https://github.com/AnimaticML/ml-collab-shell/blob/main/docs/architecture/proposal-world-runtime-capabilities.md)                    |
 
@@ -34,13 +34,13 @@ Find the local documents with `rg --files | rg '(^|/)proposal-world-runtime-'`.
 
 ## Purpose and ownership
 
-Applications will combine independently developed document components. An Animatic
-document may contain a reference to a world document and editable parameters for a
-particular camera view. A world may contain a screen playing an Animatic. Humans and
+Applications will combine independently developed document components. An AVML document
+may contain a reference to a world document and editable parameters for a
+particular camera view. A world may contain a screen playing an AVML document. Humans and
 agents should edit these documents through the same application functions and ordinary
 codec operations.
 
-Canvas IR is the proposed home for the world format and execution foundation. Animatic
+Canvas IR is the proposed home for the world format and execution foundation. ml-animatic
 owns audiovisual composition and montage. Shell owns authorized hosting and access to
 application capabilities. This handoff owns the codec questions: composing schemas,
 preserving identity and edit semantics, and determining what live component evolution
@@ -77,7 +77,7 @@ point. A new abstraction requires a demonstrated consumer gap.
 ## Agreed direction
 
 **Semantic ownership and storage placement are separate.** A camera-parameter component
-may live in an Animatic tree and participate in its history while the world component
+may live in an AVML tree and participate in its history while the world component
 module defines its meaning and domain actions. The parent owns placement in montage;
 the referenced world owns staging and shared objects; each use owns its view parameters.
 
@@ -95,7 +95,7 @@ mandatory invariants are enforced at admission rather than only by a preferred U
 
 ## Stage A: prove static composition
 
-Use one interview world with two people and two Animatic occurrences showing shot and
+Use one interview world with two people and two ml-animatic occurrences showing shot and
 reverse shot. Keep geometry and animation assets outside the document where existing
 formats suffice. The codec example needs only world identity, a reference, and a small
 parameter component; it need not implement a renderer.
