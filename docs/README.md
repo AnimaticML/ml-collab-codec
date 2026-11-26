@@ -26,6 +26,18 @@ API-example claims.
 - [Development recommendations](development/README.md): optional quality
   baseline and configuration recipes for the consuming application.
 
+## Native template implementation handoff
+
+The `template-proposal-` series records the owner-selected direction for persistent
+compositions, inferred object data and shared semantic actions.
+
+- [Composition, data and operations](proposals/template-proposal-composition-data-and-operations.md)
+  specifies the common contract, self-contained examples and implementation acceptance.
+  These are extension requirements, not claims that the current library already
+  implements templates or a generic autofix planner.
+
+Find local files with `rg --files | rg '(^|/)template-proposal-'`.
+
 ## World and runtime proposals
 
 The `proposal-world-runtime-` series records owner-requested research and
