@@ -14,7 +14,7 @@ The interview example assembles the `interview-world` and `animatic-camera` decl
 into an `interview@1` host profile. Both use declaration and implementation version
 `1.0.0`. The host owns the component tag namespace, rejects duplicate tags, defines
 allowed nesting and checks exact version pins. The world contains two stable people.
-Both Animatic occurrence nodes reference the same world key and each stores its own
+Both ml-animatic occurrence nodes reference the same world key and each stores its own
 camera values.
 
 Use a definition and reference pair for the shared key when the schema should reject
