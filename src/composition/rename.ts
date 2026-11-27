@@ -108,6 +108,7 @@ export function planCompositionRename(
     )
       continue;
     reads.push({ node: occurrence.id });
+    for (const property of ["definition", "scope"]) reads.push({ node: occurrence.id, property });
     for (const id of [occurrence.id, ...occurrence.children]) {
       reads.push({ node: id, property: "values" });
       const values = table.get(id)?.props["values"];

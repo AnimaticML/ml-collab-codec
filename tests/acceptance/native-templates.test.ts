@@ -19,3 +19,8 @@ test("C22 Inline inference is order independent and rename is undoable", () => r
 test("C23 Keyed cards preserve identity, fragments and reference ownership", () => run("cards"));
 test("C24 Semantic planning is atomic, guarded, authorized and reversible", () => run("schedule"));
 test("C25 Incremental evaluation matches a full rebuild", () => run("incremental"));
+
+test("C22 A rename rejects stale occurrence ownership", () => run("renameOwnership"));
+test("C23 Inactive object contracts do not require nested inputs", () =>
+  run("conditionalRequirements"));
+test("C23 Empty repeats validate scope before evaluating items", () => run("emptyRepeatScope"));

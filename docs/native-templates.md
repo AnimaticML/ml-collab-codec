@@ -6,6 +6,8 @@ data and `compositionField` children. An occurrence pins the definition ID and
 version and has one value carrier. A repeating occurrence gives its collection a
 canonical path and stores ordered `compositionItem` children with persistent IDs.
 Each item owns its values, so reordering the collection preserves identity and data.
+The occurrence must select a declared scope even when the collection is empty.
+A definition with no fields accepts any scope.
 
 ```ts
 import {
@@ -66,7 +68,8 @@ occurrence or item row. The result projection reads the same snapshot and identi
 each binding's owner, field, and path for writeback. Missing required inputs are
 reported as paths. A conditional field with `when: { path, equals }` depends on an
 explicit path in its own scope. Use it for requiredness and to exclude data from
-inactive variants. Omitted values, nulls, and defaults follow effective-value
+inactive variants. Nested requirements apply only when their declaring field is active.
+Omitted values, nulls, and defaults follow effective-value
 normalization in the projection. False, zero, and empty text are preserved.
 
 Bind a path to a fixed node ID and property, or use `$content` to supply fragment
@@ -100,7 +103,8 @@ occurrences. The authority checks all of them against the new definition.
 
 `planCompositionRename` renames one path segment under its existing parent. It
 updates declaration paths, matching conditions, and values in the selected scope.
-It rejects collisions. Scope names, collection mount paths, labels, and
+It rejects collisions and becomes stale if an affected occurrence changes its definition
+or scope. Scope names, collection mount paths, labels, and
 cross-document paths have their own identities and policies.
 
 ## Action admission

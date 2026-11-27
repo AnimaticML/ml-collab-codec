@@ -20,6 +20,8 @@ export interface CompositionField {
   readonly path: string;
   readonly label: JsonValue | undefined;
   readonly required: boolean;
+  /** Required members contributed by this field's contract, subject to its condition. */
+  readonly requiredMembers?: readonly string[];
   readonly condition: { readonly path: string; readonly equals: JsonValue } | undefined;
   readonly target: string | undefined;
   readonly property: string | undefined;
@@ -117,16 +119,28 @@ function child(parent: Entry, key: string): Entry {
   return node;
 }
 
-function contribute(node: Entry, schema: JsonObject, at: string): void {
+function contribute(
+  node: Entry,
+  schema: JsonObject,
+  at: string,
+  path: string,
+  requiredMembers: string[],
+): void {
   const { properties, ...facts } = schema;
   node.declared = true;
   node.contract = combine(node.contract, facts, at);
+  if (isJsonArray(facts["required"])) {
+    for (const name of facts["required"]) {
+      if (typeof name !== "string") fail(at, "required member must have a declaration");
+      requiredMembers.push(`${path}.${name}`);
+    }
+  }
   if (properties === undefined) return;
   if (!isJsonObject(properties)) fail(at, "properties must be an object");
   for (const [key, value] of Object.entries(properties)) {
     if (segments(key).length !== 1 || !isJsonObject(value))
       fail(at, "invalid object property contract");
-    contribute(child(node, key), value, at);
+    contribute(child(node, key), value, at, `${path}.${key}`, requiredMembers);
   }
 }
 
@@ -201,9 +215,10 @@ export function inferComposition(table: Table, definition: string): CompositionI
     }
     let node = scope;
     for (const part of segments(field.path)) node = child(node, part);
-    if (row.props["contract"] !== undefined)
-      contribute(node, record(row.props["contract"]), row.id);
-    return field;
+    if (row.props["contract"] === undefined) return field;
+    const requiredMembers: string[] = [];
+    contribute(node, record(row.props["contract"]), row.id, field.path, requiredMembers);
+    return requiredMembers.length === 0 ? field : { ...field, requiredMembers };
   });
   for (const field of fields) {
     if (field.condition === undefined) continue;

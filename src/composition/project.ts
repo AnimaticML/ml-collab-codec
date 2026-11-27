@@ -97,6 +97,8 @@ export function prepareOccurrence(
       fail(occurrence.id, `unavailable dependency "${dependency}" at ${canonicalJson(pin)}`);
   }
   const scope = token(occurrence.props["scope"], occurrence.id);
+  if (model.scopes.size > 0 && !model.scopes.has(scope))
+    fail(occurrence.id, `unknown scope "${scope}"`);
   const fields = model.fields.filter((field) => field.scope === scope);
   const fragment = readFragment(definition.props["fragment"], definition.id);
   const targets = bindingTargets(fragment);
@@ -126,14 +128,14 @@ export function prepareOccurrence(
       owner: owner.id,
       value: readPath(values, field.path),
     }));
-    const declared = model.required.get(scope) ?? [];
-    const conditional = fields
-      .filter((field) => field.required && active(field, values))
-      .map((field) => field.path);
+    const required = fields
+      .filter((field) => active(field, values))
+      .flatMap((field) => [
+        ...(field.required ? [field.path] : []),
+        ...(field.requiredMembers ?? []),
+      ]);
     const missing = [
-      ...new Set(
-        [...declared, ...conditional].filter((path) => readPath(values, path) === undefined),
-      ),
+      ...new Set(required.filter((path) => readPath(values, path) === undefined)),
     ].sort();
     const result = {
       id: canonicalJson([occurrence.id, owner.id]),

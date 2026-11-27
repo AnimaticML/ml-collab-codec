@@ -510,8 +510,137 @@ function incremental() {
   );
 }
 
-const cases = { participant, cards, schedule, incremental };
+function renameOwnership() {
+  const base = table(
+    doc([
+      definition("original", [
+        field("original-name", "name", string),
+        field("alternate-name", "name", string, {}, "alternate"),
+        field("alternate-alias", "alias", string, {}, "alternate"),
+      ]),
+      definition("other", [
+        field("other-name", "name", string),
+        field("other-alias", "alias", string),
+      ]),
+      occurrence("answer", "original", { name: "Ada" }),
+    ]),
+  );
+  for (const change of [{ definition: "other" }, { scope: "alternate" }, {}]) {
+    const authority = Authority.create("rename", "epoch", base, {
+      schema: profile,
+      validators: [compositionValidator()],
+    });
+    const alice = join(authority, "alice");
+    const bob = join(authority, "bob");
+    const plan = planCompositionRename(
+      alice.getSnapshot().table,
+      "original",
+      "form",
+      "name",
+      "alias",
+    );
+    submitSemanticPlan(alice, plan);
+    const queued = alice.nextRequest();
+    assert.ok(queued);
+    const changes = Object.entries(change);
+    if (changes.length > 0) {
+      bob.transact((draft) => {
+        for (const [key, value] of changes) draft.set("answer", key, value);
+      });
+      assert.equal(submit(authority, bob, [alice]).outcome, "applied");
+    }
+    const decision = authority.submit(queued, { actor: "alice" });
+    assert.equal(decision.kind, "decided");
+    const current = authority.getTable();
+    if (changes.length > 0) {
+      assert.equal(decision.receipt.reason, "conflict: stale action reads");
+      assert.equal(decision.transition, undefined);
+      assert.equal(current.get("original-name").props.path, "name");
+      assert.deepEqual(current.get("answer").props.values, { name: "Ada" });
+      for (const [key, value] of changes) assert.equal(current.get("answer").props[key], value);
+    } else {
+      assert.equal(decision.receipt.outcome, "applied");
+      assert.equal(current.get("original-name").props.path, "alias");
+      assert.deepEqual(current.get("answer").props.values, { alias: "Ada" });
+    }
+  }
+}
+
+function conditionalRequirements() {
+  const detail = object({ name: string });
+  const whenFull = { when: { path: "kind", equals: "full" } };
+  const conditional = definition("variants", [
+    field("kind", "kind", { enum: ["short", "full"] }),
+    field("detail", "detail", detail, whenFull),
+    field("always", "always", object({ id: string })),
+  ]);
+  const base = table(
+    doc([
+      conditional,
+      occurrence("short", "variants", { kind: "short", always: { id: "x" } }),
+      occurrence("full", "variants", { kind: "full", detail: {}, always: { id: "x" } }),
+      occurrence("complete", "variants", { kind: "full", detail: { name: "Ada" } }),
+      occurrence("excluded", "variants", { kind: "short", detail: { name: "Ada" } }),
+      occurrence("filled", "variants", {
+        kind: "full",
+        detail: { name: "Ada" },
+        always: { id: "x" },
+      }),
+    ]),
+  );
+  const validated = [];
+  const options = {
+    validateResult: (result) => {
+      validated.push(result.owner);
+      return null;
+    },
+  };
+  assert.deepEqual(projectComposition(base, "short", options)[0].missing, []);
+  assert.deepEqual(projectComposition(base, "full", options)[0].missing, ["detail.name"]);
+  assert.deepEqual(projectComposition(base, "complete", options)[0].missing, ["always.id"]);
+  assert.throws(
+    () => projectComposition(base, "excluded", options),
+    /excluded by the selected variant/,
+  );
+  assert.deepEqual(projectComposition(base, "filled", options)[0].missing, []);
+  assert.deepEqual(validated, ["short", "filled"]);
+}
+
+function emptyRepeatScope() {
+  const base = table(
+    doc([
+      definition("scoped", [field("name", "name", string)]),
+      definition("fixed", []),
+      occurrence("empty", "scoped", undefined, "form", { repeat: "rows" }),
+      occurrence("fixed-empty", "fixed", undefined, "any", { repeat: "rows" }),
+    ]),
+  );
+  const authority = Authority.create("repeat", "epoch", base, {
+    schema: profile,
+    validators: [compositionValidator()],
+  });
+  const editor = join(authority, "editor");
+  assert.deepEqual(projectComposition(base, "empty"), []);
+  assert.deepEqual(projectComposition(base, "fixed-empty"), []);
+  editor.transact((draft) => draft.set(ROOT_ID, "title", "Validated"));
+  assert.equal(submit(authority, editor).outcome, "applied");
+  editor.transact((draft) => draft.set("empty", "scope", "typo"));
+  const message = /empty: unknown scope "typo"/;
+  assert.throws(() => projectComposition(editor.getSnapshot().table, "empty"), message);
+  assert.match(submit(authority, editor).reason, message);
+  assert.equal(authority.getTable().get("empty").props.scope, "form");
+}
+
+const cases = {
+  participant,
+  cards,
+  schedule,
+  incremental,
+  renameOwnership,
+  conditionalRequirements,
+  emptyRepeatScope,
+};
 const selected = process.argv[2];
-if (selected === undefined) for (const run of Object.values(cases)) run();
+if (selected === undefined) for (const run of [participant, cards, schedule, incremental]) run();
 else cases[selected]();
 console.log("NATIVE_TEMPLATES_OK");
