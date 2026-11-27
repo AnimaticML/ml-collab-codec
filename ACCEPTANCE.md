@@ -310,3 +310,13 @@ and example tests into `bun run check`; they are part of required delivery.
 rejects acceptance TODO/skip/focus, and requires a production entry point. It is a
 lightweight bookkeeping guard, not a semantic verifier. Passing it with empty tests
 is unacceptable. All baseline tests and the extended test suite must actually pass.
+
+## Persistent composition
+
+| ID  | Required outcome                                                                    |
+| --- | ----------------------------------------------------------------------------------- |
+| C21 | Native definitions, bindings and partial values round trip through source and JSON. |
+| C22 | Scoped dotted paths merge independently of order and rename atomically.             |
+| C23 | Keyed repetitions retain identity and reference-aware copies remap internal keys.   |
+| C24 | Semantic plans admit authorized consequences atomically and reject stale reads.     |
+| C25 | Indexed evaluation agrees with a full rebuild after targeted changes.               |

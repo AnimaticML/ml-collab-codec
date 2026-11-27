@@ -8,6 +8,8 @@ whether templates belong in the shared document foundation. Public API spelling,
 representation details, and implementation order within each phase are delegated.
 The proposed capabilities are not claims about the inspected implementation.
 
+See the [native template guide](../native-templates.md) for implemented APIs and runnable evidence.
+
 ## Purpose and boundaries
 
 Provide a reusable module in or immediately alongside this library for composing

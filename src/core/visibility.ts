@@ -135,6 +135,16 @@ export class RestrictedAuthority {
     this.authority = Authority.create(documentId, historyEpoch, initial, {
       validators,
       authorize: (actor, changes, current) => this.scopedAllowed(actor, changes, current),
+      authorizeActionReads: (actor, reads, current) =>
+        reads.every(({ node, property }) => {
+          const row = current.get(node);
+          return (
+            row !== undefined &&
+            canSee(current, profile, node, actor) &&
+            (property !== undefined ||
+              row.children.every((id) => canSee(current, profile, id, actor)))
+          );
+        }),
     });
   }
 

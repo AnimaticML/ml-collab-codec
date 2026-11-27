@@ -1151,3 +1151,24 @@ transform correctly refuses to delete or overwrite content it does not own.
 - **Grouping is separate.** Typing policy and explicit groups are unchanged. The repair
   makes undo work across any boundary (default policy, pause, caret movement, explicit
   segments); an application may still choose larger explicit groups for its own UX.
+
+## 20. Native composition and guarded semantic actions
+
+The host opts into the version 1 native template component declarations and installs
+a composition candidate validator. Definition and field carriers, occurrence
+version pins, and ordered stable item rows are persisted as ordinary document
+nodes. Supplied values have one owner. The composition module derives interfaces
+from scoped dotted paths, validates supplied values with the schema compiler, and
+projects fixed and bound fragment content from the same snapshot. The host chooses
+placement, trusted dependencies and result validation. Missing required answers
+affect readiness. Source and JSON round trips preserve template data.
+
+An optional transaction context adds a policy, bounded read guards and effect rule
+names to the existing request metadata. Guarded requests have a separate own
+history group and cannot be packed. The authority checks read authorization and
+captured values against its current accepted state before admitting rebased
+writes. Guards and provenance participate in the canonical request bytes. Published and stored
+transitions omit captured read values and preserve accepted primitives, whose stable origin ordinals identify
+the corresponding planned rules. Undo and redo continue to use accepted effects
+in current context. See the [native template guide](docs/native-templates.md) for
+supported inference, copy, planner and invalidation boundaries and C21–C25 evidence.

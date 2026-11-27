@@ -17,6 +17,7 @@ API-example claims.
 | [Hosting and retention](hosting.md)             | Async durable store contract, checkpoints, pruning, history horizons                         |
 | [Agents and providers](agents.md)               | Diff, proposals and rebasing, provider schema exports and decoding                           |
 | [Ownership and runtime](runtime.md)             | Read-only snapshots, copies, publication, derived state, projections, scheduling             |
+| [Native templates](native-templates.md)         | Persistent interfaces and bindings, keyed repeats, semantic planning and validation          |
 | [Composition and extension](composition.md)     | Built-package interview and tabletop examples, dependency admission and reopening            |
 | [Verification and performance](verification.md) | Commands, test families, reports, budgets, known limits                                      |
 

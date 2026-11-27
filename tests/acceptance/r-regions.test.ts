@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { captureActionGuards } from "../../src/core/action-guards.ts";
 import { Client } from "../../src/core/client.ts";
 import { SequenceAllocator } from "../../src/core/identity.ts";
 import type { RestrictedAuthority } from "../../src/core/visibility.ts";
@@ -79,6 +80,37 @@ function stream(game: RestrictedAuthority, secret: string): { alice: string; obs
 }
 
 describe("R32 history additions preserve restricted-region safety", () => {
+  test("R32 Guarded writes cannot test guessed private values", () => {
+    const request = (secret: string) => {
+      const guessed = setupGame("7").fullView();
+      const actual = setupGame(secret);
+      const replica = "replica-alice";
+      return actual
+        .submit(
+          envelope(
+            replica,
+            1,
+            0,
+            build(guessed, replica, 1, (b) => b.set("cardA1", "rank", "A")),
+            {
+              policy: "guess/1",
+              guards: captureActionGuards(guessed, [{ node: "cardB1", property: "rank" }]),
+            },
+          ),
+          { actor: "alice" },
+        )
+        .eventsFor("alice");
+    };
+    expect(request("7")).toEqual(request("K"));
+    expect(request("7")).toEqual([
+      expect.objectContaining({
+        type: "receipt",
+        outcome: "rejected",
+        reason: "not authorized",
+      }),
+    ]);
+  });
+
   test("R32 History additions preserve restricted-region safety", () => {
     // Deleted private values, inverse payloads, and rejection receipts stay inside bob's region.
     const [first, second] = [stream(setupGame("7"), "9"), stream(setupGame("K"), "J")];

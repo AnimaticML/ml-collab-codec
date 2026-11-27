@@ -1,3 +1,4 @@
+import { staleAction } from "./action-guards.ts";
 import type { Change } from "./change.ts";
 import { applyChanges } from "./apply.ts";
 import type { CandidateValidator } from "./invariants.ts";
@@ -6,7 +7,7 @@ import type { ReceiptEvent, RequestEnvelope, TransitionEvent } from "./protocol.
 import { ApplyError } from "./staging.ts";
 import type { Table } from "./table.ts";
 import { isConflict, rebase } from "./transform.ts";
-import type { Authorizer, Prepared } from "./authority-types.ts";
+import type { AuthorityOptions, Authorizer, Prepared } from "./authority-types.ts";
 
 /** The accepted state a decision is evaluated against. */
 export interface DecisionContext {
@@ -18,6 +19,7 @@ export interface DecisionContext {
   readonly ledgerVersion: number;
   readonly validators: readonly CandidateValidator[];
   readonly authorize: Authorizer | undefined;
+  readonly authorizeActionReads: AuthorityOptions["authorizeActionReads"];
 }
 
 function receiptFor(
@@ -112,6 +114,15 @@ export function evaluateRequest(
   const { changes, candidate } = built;
   if (!trusted && ctx.authorize !== undefined && !ctx.authorize(actor, changes, ctx.table))
     return rejection(ctx, envelope, "not authorized", actor, print);
+  const guards = envelope.meta.guards;
+  if (
+    guards !== undefined &&
+    !trusted &&
+    ctx.authorizeActionReads?.(actor, guards, ctx.table) === false
+  )
+    return rejection(ctx, envelope, "not authorized", actor, print);
+  if (envelope.meta.guards !== undefined && staleAction(ctx.table, envelope.meta.guards))
+    return rejection(ctx, envelope, "conflict: stale action reads", actor, print);
   for (const validator of ctx.validators) {
     const reason = validator(candidate, changes, ctx.table);
     if (reason !== null) return rejection(ctx, envelope, reason, actor, print);
@@ -128,6 +139,8 @@ export function evaluateRequest(
       commit,
     };
   const revision = ctx.revision + 1;
+  // Read expectations are admission inputs. Published history only needs effect attribution.
+  const { guards: _guards, ...publishedMeta } = envelope.meta;
   const transition: TransitionEvent = {
     type: "transition",
     documentId: ctx.documentId,
@@ -135,7 +148,7 @@ export function evaluateRequest(
     revision,
     request: { replica: envelope.replica, seq: envelope.seq },
     actor,
-    meta: envelope.meta,
+    meta: publishedMeta,
     changes,
   };
   const receipt = receiptFor(ctx, envelope, "applied", { committedRevision: revision });

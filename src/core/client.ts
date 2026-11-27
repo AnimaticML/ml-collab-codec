@@ -1,8 +1,10 @@
+import { guardAuthoring } from "./action-guards.ts";
+import type { GuardedAction } from "./action-guards.ts";
 import { ChangeBuilder } from "./builder.ts";
 import { AuthoringState, envelopeFor } from "./client-authoring.ts";
 import type { Exclusion, PendingEntry } from "./client-queue.ts";
 import type { Step, SyncState } from "./client-state.ts";
-import { exclude, materialize } from "./client-state.ts";
+import { exclude, materialize, resyncedState } from "./client-state.ts";
 import { classify } from "./grouping.ts";
 import { UndoHistory } from "./history.ts";
 import type { RequestId } from "./identity.ts";
@@ -144,10 +146,13 @@ export class Client implements DocumentStore {
   }
 
   /** Author one local change against the visible state. Never waits for the network. */
-  transact(build: (builder: ChangeBuilder) => void): TransactResult {
-    return this.publisher.batch("local", () => this.author(build, {}, "local"), {
-      status: "queued",
-    });
+  transact(build: (builder: ChangeBuilder) => void, action?: GuardedAction): TransactResult {
+    const meta = guardAuthoring(action);
+    return this.publisher.batch(
+      "local",
+      () => this.author(meta.check(this.state.visible, build), meta.request, "local"),
+      { status: "queued" },
+    );
   }
 
   /** Shared authoring path for local edits and undo/redo requests. */
@@ -166,12 +171,14 @@ export class Client implements DocumentStore {
     const isHistoryAction = meta.undoOf !== undefined || meta.redoOf !== undefined;
     const group = isHistoryAction
       ? undefined
-      : this.authoring.chooseGroup(
-          `${this.replica}#${seq}`,
-          shape,
-          at,
-          (id: string) => this.history.get(id) !== undefined,
-        );
+      : meta.guards !== undefined
+        ? `${this.replica}#${seq}`
+        : this.authoring.chooseGroup(
+            `${this.replica}#${seq}`,
+            shape,
+            at,
+            (id: string) => this.history.get(id) !== undefined,
+          );
     const fullMeta: RequestMeta = {
       ...meta,
       ...(group === undefined ? {} : { group }),
@@ -271,23 +278,10 @@ export class Client implements DocumentStore {
     this.publisher.batch(
       "restore",
       () => {
-        const retained = this.state.pending.map((entry) => ({
-          id: entry.id,
-          meta: entry.meta,
-          working: entry.working,
-          status: "resync" as const,
-          reason,
-        }));
         this.history.forgetAll(revision);
         this.historyStatus = { status: "unavailable", reason };
         this.inbox.clear();
-        const state = {
-          confirmed: table,
-          revision,
-          pending: [],
-          retained: [...this.state.retained, ...retained],
-          visible: table,
-        };
+        const state = resyncedState(this.state, table, revision, reason);
         this.commitStep({ state, mapping: [] }, "restore", [`resync: ${reason}`]);
         this.publisher.stageRestore(table);
       },

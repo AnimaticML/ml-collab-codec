@@ -192,3 +192,24 @@ export {
   RestrictedAuthority,
 } from "./core/visibility.ts";
 export type { ActionHandler, RestrictedDecision } from "./core/visibility.ts";
+
+export { compositionComponents, CompositionError } from "./composition/native.ts";
+export type { CompositionDiagnostic } from "./composition/native.ts";
+export { inferComposition } from "./composition/inference.ts";
+export type { CompositionField, CompositionInterface } from "./composition/inference.ts";
+export { projectComposition } from "./composition/project.ts";
+export { compositionValidator } from "./composition/validator.ts";
+export type {
+  CompositionOptions,
+  CompositionResult,
+  ProjectedBinding,
+} from "./composition/project.ts";
+export { CompositionIndex } from "./composition/indexed.ts";
+export { copyCompositionFragment } from "./composition/fragments.ts";
+export { captureActionGuards } from "./core/action-guards.ts";
+export type { ActionRead, ActionGuard, GuardedAction } from "./core/action-guards.ts";
+export { planSemanticAction, submitSemanticPlan } from "./composition/actions.ts";
+export type { ActionChecks, ActionStep, SemanticPlan } from "./composition/actions.ts";
+export { planCompositionRename } from "./composition/rename.ts";
+export { compositionReviewKey, resolveCompositionPath } from "./composition/identity.ts";
+export type { CompositionPath } from "./composition/identity.ts";

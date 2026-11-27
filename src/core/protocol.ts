@@ -1,3 +1,5 @@
+import { decodeActionGuards, decodeActionRules } from "./action-guards.ts";
+import type { ActionGuard } from "./action-guards.ts";
 import type { Change } from "./change.ts";
 import { OPERATION_FORMAT } from "./change.ts";
 import { canonicalJson, decodeChanges, DecodeError, nonNegativeInt } from "./change-codec.ts";
@@ -23,6 +25,9 @@ export interface RequestMeta {
   readonly packed?: readonly number[];
   /** Local wall-clock time for grouping/UI only; never used for ordering or deduplication. */
   readonly authoredAt?: number;
+  readonly guards?: readonly ActionGuard[];
+  readonly policy?: string;
+  readonly rules?: readonly string[];
 }
 
 /** The immutable submitted form of a request: identity, submitted context, and payload. */
@@ -101,6 +106,9 @@ const META_KEYS = new Set([
   "predecessors",
   "packed",
   "authoredAt",
+  "guards",
+  "policy",
+  "rules",
 ]);
 
 function sequences(value: unknown, path: string): number[] {
@@ -128,6 +136,9 @@ export function decodeMeta(value: unknown): RequestMeta {
     ...text("group"),
     ...text("undoOf"),
     ...text("redoOf"),
+    ...text("policy"),
+    ...(raw["rules"] === undefined ? {} : { rules: decodeActionRules(raw["rules"]) }),
+    ...(raw["guards"] === undefined ? {} : { guards: decodeActionGuards(raw["guards"]) }),
     ...(raw["authoredRevision"] === undefined
       ? {}
       : { authoredRevision: nonNegativeInt(raw["authoredRevision"], "meta.authoredRevision") }),

@@ -117,7 +117,12 @@ export class AuthoringState {
     seq: number,
   ): PendingEntry[] | undefined {
     const last = pending[pending.length - 1];
-    if (last === undefined || last.state !== "unsent" || last.meta.group !== group)
+    if (
+      last === undefined ||
+      last.state !== "unsent" ||
+      last.meta.group !== group ||
+      last.meta.guards !== undefined
+    )
       return undefined;
     const allowed = this.coalescing.allow({
       sameGroup: true,

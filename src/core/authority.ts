@@ -199,6 +199,7 @@ export class Authority {
       ledgerVersion: this.ledgerVersion,
       validators: this.validators,
       authorize: this.options.authorize,
+      authorizeActionReads: this.options.authorizeActionReads,
     };
   }
 

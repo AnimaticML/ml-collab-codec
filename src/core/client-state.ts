@@ -170,3 +170,25 @@ export function exclude(state: SyncState, exclusions: ReadonlyMap<string, Exclus
     [...retainedDoomed, ...result.retained],
   );
 }
+
+export function resyncedState(
+  state: SyncState,
+  table: Table,
+  revision: number,
+  reason: string,
+): SyncState {
+  const retained = state.pending.map(({ id, meta, working }) => ({
+    id,
+    meta,
+    working,
+    status: "resync" as const,
+    reason,
+  }));
+  return {
+    confirmed: table,
+    revision,
+    pending: [],
+    retained: [...state.retained, ...retained],
+    visible: table,
+  };
+}

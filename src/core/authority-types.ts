@@ -1,3 +1,4 @@
+import type { ActionRead } from "./action-guards.ts";
 import type { Change } from "./change.ts";
 import type { RequestId } from "./identity.ts";
 import type { CandidateValidator } from "./invariants.ts";
@@ -33,6 +34,12 @@ export interface AuthorityOptions {
   readonly schema?: SchemaProfile;
   readonly validators?: readonly CandidateValidator[];
   readonly authorize?: Authorizer;
+  /** For documents with restricted reads, authorize guarded dependencies before comparing them. */
+  readonly authorizeActionReads?: (
+    actor: string,
+    reads: readonly ActionRead[],
+    current: Table,
+  ) => boolean;
 }
 
 export type Decision =
